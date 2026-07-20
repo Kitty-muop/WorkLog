@@ -1,0 +1,67 @@
+{
+  "total_score": 64,
+  "streak": 0,
+  "max_streak": 2,
+  "last_logged_date": null,
+  "daily_history": {
+    "2026-07-15": [
+      {
+        "date": "2026-07-15",
+        "score": 32,
+        "hours": 3.5,
+        "tasks": 1
+      },
+      {
+        "date": "2026-07-15",
+        "score": 32,
+        "hours": 3.5,
+        "tasks": 1
+      }
+    ],
+    "2026-07-17": [
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      },
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      },
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      },
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      },
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      },
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      },
+      {
+        "date": "2026-07-17",
+        "score": 0,
+        "hours": 0,
+        "tasks": 0
+      }
+    ]
+  },
+  "level": 3
+}

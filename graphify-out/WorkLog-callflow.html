@@ -1,0 +1,2276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WorkLog — Complete Call Flow &amp; Architecture Documentation</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0f172a; --surface: #1e293b; --border: #334155;
+  --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+  --warn: #fbbf24; --err: #f87171; --ok: #34d399;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+.container { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+h1 { font-size: 2.4rem; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+h2 { font-size: 1.7rem; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); }
+h3 { font-size: 1.25rem; margin: 32px 0 12px; color: var(--accent); }
+h4 { font-size: 1.05rem; margin: 20px 0 8px; color: var(--warn); }
+p { margin: 8px 0; color: var(--muted); }
+.subtitle { color: var(--muted); font-size: 1.1rem; margin-bottom: 32px; }
+.mermaid { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 20px 0; overflow-x: auto; position: relative; }
+.mermaid.is-enhanced { padding: 0; overflow: hidden; min-height: 260px; }
+.mermaid-viewport { padding: 54px 24px 24px; overflow: hidden; cursor: grab; touch-action: none; min-height: 260px; }
+.mermaid-viewport.is-dragging { cursor: grabbing; }
+.mermaid-viewport svg { max-width: none !important; height: auto; transform-origin: 0 0; transition: transform 120ms ease; }
+.mermaid-toolbar { position: absolute; top: 10px; right: 10px; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px; background: rgba(15,23,42,0.92); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.28); }
+.mermaid-toolbar button, .mermaid-toolbar .zoom-level { height: 28px; min-width: 32px; border: 1px solid var(--border); border-radius: 6px; background: #1e293b; color: var(--text); font: 600 0.78rem system-ui, sans-serif; display: inline-flex; align-items: center; justify-content: center; }
+.mermaid-toolbar button { cursor: pointer; }
+.mermaid-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+.mermaid-toolbar .zoom-level { min-width: 52px; color: var(--muted); background: transparent; }
+.call-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+.call-table th { background: #1a2744; color: var(--accent); text-align: left; padding: 10px 14px; border: 1px solid var(--border); }
+.call-table td { padding: 8px 14px; border: 1px solid var(--border); vertical-align: top; }
+.call-table tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.tag-async { background: #7c3aed33; color: #a78bfa; }
+.tag-class { background: #05966933; color: var(--ok); }
+.tag-func { background: #2563eb33; color: var(--accent); }
+.tag-cmd { background: #d9770633; color: var(--warn); }
+.tag-endpoint { background: #dc262633; color: var(--err); }
+.tag-hook { background: #db277733; color: #f472b6; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 16px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin: 16px 0; }
+.arrow-chain { font-family: 'Fira Code', monospace; font-size: 0.85rem; color: var(--accent); padding: 10px; background: rgba(56,189,248,0.06); border-radius: 6px; }
+code { font-family: 'Fira Code', 'Cascadia Code', monospace; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 3px; font-size: 0.88em; }
+ul, ol { margin: 8px 0 8px 24px; color: var(--muted); }
+li { margin: 4px 0; }
+a { color: var(--accent); }
+hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+.nav { position: sticky; top: 0; background: var(--bg); z-index: 10; padding: 12px 0; border-bottom: 1px solid var(--border); display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9rem; }
+.nav a { text-decoration: none; }
+.nav a:hover { text-decoration: underline; }
+@media (max-width: 768px) { .container { padding: 16px; } h1 { font-size: 1.8rem; } }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>WorkLog — Complete Call Flow &amp; Architecture Documentation</h1>
+<p class="subtitle">Generated from graphify knowledge graph: 121 nodes, 148 edges, 14 communities. Commit: unknown</p>
+
+<div class="nav">
+    <a href="#overview">Architecture Overview</a>
+    <a href="#build-graph">Graph Build</a>
+    <a href="#outputs-docs">Outputs &amp; Docs</a>
+    <a href="#community-0">Community 0</a>
+    <a href="#community-1">Community 1</a>
+    <a href="#community-2">Community 2</a>
+    <a href="#community-3">Community 3</a>
+    <a href="#community-4">Community 4</a>
+    <a href="#community-5">Community 5</a>
+    <a href="#community-6">Community 6</a>
+    <a href="#community-7">Community 7</a>
+    <a href="#community-9">Community 9</a>
+    <a href="#community-10">Community 10</a>
+    <a href="#community-12">Community 12</a>
+    <a href="#community-13">Community 13</a>
+</div>
+
+<!-- ====== Architecture Overview ====== -->
+<h2 id="overview">1. Architecture Overview</h2>
+
+<div class="mermaid">
+
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    BUILD_GRAPH_321CBB04("Graph Build<br/><small>2 nodes</small>")
+    class BUILD_GRAPH_321CBB04 module;
+    OUTPUTS_DOCS_ED82387C("Outputs &amp; Docs<br/><small>3 nodes</small>")
+    class OUTPUTS_DOCS_ED82387C module;
+    COMMUNITY_0_B056AD3D("Community 0<br/><small>28 nodes</small>")
+    class COMMUNITY_0_B056AD3D module;
+    COMMUNITY_1_3073A0DB("Community 1<br/><small>18 nodes</small>")
+    class COMMUNITY_1_3073A0DB module;
+    COMMUNITY_2_8C8DF7B9("Community 2<br/><small>15 nodes</small>")
+    class COMMUNITY_2_8C8DF7B9 module;
+    COMMUNITY_3_D8DFCEA7("Community 3<br/><small>15 nodes</small>")
+    class COMMUNITY_3_D8DFCEA7 module;
+    COMMUNITY_4_AC2DC2A9("Community 4<br/><small>10 nodes</small>")
+    class COMMUNITY_4_AC2DC2A9 module;
+    COMMUNITY_5_2966028D("Community 5<br/><small>8 nodes</small>")
+    class COMMUNITY_5_2966028D module;
+    COMMUNITY_6_7D637A07("Community 6<br/><small>8 nodes</small>")
+    class COMMUNITY_6_7D637A07 module;
+    COMMUNITY_7_989501FC("Community 7<br/><small>7 nodes</small>")
+    class COMMUNITY_7_989501FC module;
+    COMMUNITY_9_1D55D1EE("Community 9<br/><small>3 nodes</small>")
+    class COMMUNITY_9_1D55D1EE module;
+    COMMUNITY_10_48432F59("Community 10<br/><small>2 nodes</small>")
+    class COMMUNITY_10_48432F59 module;
+    COMMUNITY_12_82F13F05("Community 12<br/><small>1 nodes</small>")
+    class COMMUNITY_12_82F13F05 module;
+    COMMUNITY_13_E329587C("Community 13<br/><small>1 nodes</small>")
+    class COMMUNITY_13_E329587C module;
+    COMMUNITY_1_3073A0DB -->|contains| COMMUNITY_5_2966028D
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h4>Architecture Layers</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>Layer</th><th>Nodes</th><th>Communities</th></tr>
+      <tr><td>Graph Build</td><td>2</td><td><code>11</code></td></tr><tr><td>Outputs &amp; Docs</td><td>3</td><td><code>8</code></td></tr><tr><td>Community 0</td><td>28</td><td><code>0</code></td></tr><tr><td>Community 1</td><td>18</td><td><code>1</code></td></tr><tr><td>Community 2</td><td>15</td><td><code>2</code></td></tr><tr><td>Community 3</td><td>15</td><td><code>3</code></td></tr><tr><td>Community 4</td><td>10</td><td><code>4</code></td></tr><tr><td>Community 5</td><td>8</td><td><code>5</code></td></tr><tr><td>Community 6</td><td>8</td><td><code>6</code></td></tr><tr><td>Community 7</td><td>7</td><td><code>7</code></td></tr><tr><td>Community 9</td><td>3</td><td><code>9</code></td></tr><tr><td>Community 10</td><td>2</td><td><code>10</code></td></tr><tr><td>Community 12</td><td>1</td><td><code>12</code></td></tr><tr><td>Community 13</td><td>1</td><td><code>13</code></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Core Flow</h4>
+    <div class="arrow-chain">Graph Build -&gt; Outputs &amp; Docs -&gt; Community 0 -&gt; Community 1 -&gt; Community 5 -&gt; Community 2 -&gt; Community 3</div>
+  </div>
+</div>
+<div class="grid">
+  <div class="card">
+    <h4>Graph Report Highlights</h4>
+    <ul>
+      <li>121 nodes · 148 edges · 14 communities (12 shown, 2 thin omitted)</li>
+      <li>Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS</li>
+      <li>Token cost: 0 input · 0 output</li>
+      <li>1. `Worklog.xlsx — Hướng dẫn sử dụng` - 13 edges</li>
+      <li>2. `run()` - 9 edges</li>
+      <li>3. `load_state()` - 7 edges</li>
+    </ul>
+  </div>
+</div>
+<hr>
+<!-- ====== 2. Graph Build ====== -->
+<h2 id="build-graph">2. Graph Build</h2>
+<p>Graph Build groups implementation around buildpy, tools, style, header, mostly in tools/build.py. This section covers 2 nodes and 1 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Graph Build (2 nodes, 1 edges)
+    tools_build_py_0561af3c("build.py")
+    tools_build_style_header_0b9e3e2f("style_header()<br/><small>tools/build.py</small>")
+    tools_build_py_0561af3c -->|contains| tools_build_style_header_0b9e3e2f
+    class tools_build_py_0561af3c module;
+    class tools_build_style_header_0b9e3e2f function;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>build.py</code><br><small style="color:var(--muted)">tools/build.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/build.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>style_header()</code><br><small style="color:var(--muted)">tools/build.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>style_header() node in tools/build.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/build.py</code></td><td>2 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 3. Outputs & Docs ====== -->
+<h2 id="outputs-docs">3. Outputs &amp; Docs</h2>
+<p>Outputs &amp; Docs groups implementation around reportpy, tools, title, run, mostly in tools/report.py. This section covers 3 nodes and 3 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Outputs &amp; Docs (3 nodes, 3 edges)
+    tools_report_title_15faaafe("title()<br/><small>tools/report.py</small>")
+    tools_report_run_ae8466ad("run()<br/><small>tools/report.py</small>")
+    tools_report_py_2f0a9e34("report.py")
+    tools_report_title_15faaafe -->|calls| tools_report_run_ae8466ad
+    class tools_report_title_15faaafe function;
+    class tools_report_run_ae8466ad function;
+    class tools_report_py_2f0a9e34 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>report.py</code><br><small style="color:var(--muted)">tools/report.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/report.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>title()</code><br><small style="color:var(--muted)">tools/report.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/report.py</small></td>
+  <td>title() node in tools/report.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/report.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>title()</code><br><small style="color:var(--muted)">tools/report.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>run() node in tools/report.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/report.py</code></td><td>3 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x2, calls x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 4. Community 0 ====== -->
+<h2 id="community-0">4. Community 0</h2>
+<p>Community 0 groups implementation around timerpy, tools, cmd, state, mostly in tools/timer.py. This section covers 28 nodes and 53 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 0 (28 nodes, 53 edges)
+    tools_timer_load_state_af1f7a81("load_state()<br/><small>tools/timer.py</small>")
+    tools_timer_get_elapsed_cf007a73("get_elapsed()<br/><small>tools/timer.py</small>")
+    tools_timer_save_state_806802e6("save_state()<br/><small>tools/timer.py</small>")
+    tools_timer_clear_state_af83f55d("clear_state()<br/><small>tools/timer.py</small>")
+    tools_timer_detect_branch_580d8716("detect_branch()<br/><small>tools/timer.py</small>")
+    tools_timer_detect_project_3b16be08("detect_project()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_start_1eae5aa5("cmd_start()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_stop_9a86b9e8("cmd_stop()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_cancel_c9167ee9("cmd_cancel()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_status_5199f367("cmd_status()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_pause_9049d219("cmd_pause()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_continue_ae5aea29("cmd_continue()<br/><small>tools/timer.py</small>")
+    tools_timer_detect_commit_msg_ac777710("detect_commit_msg()<br/><small>tools/timer.py</small>")
+    tools_timer_get_day_name_3728430b("get_day_name()<br/><small>tools/timer.py</small>")
+    tools_timer_append_entry_b15f7218("append_entry()<br/><small>tools/timer.py</small>")
+    tools_timer_find_next_row_70bb9e3c("find_next_row()<br/><small>tools/timer.py</small>")
+    tools_timer_get_duration_cfed123a("get_duration()<br/><small>tools/timer.py</small>")
+    tools_timer_cmd_today_ac5e162b("cmd_today()<br/><small>tools/timer.py</small>")
+    tools_timer_load_state_af1f7a81 -->|calls| tools_timer_cmd_start_1eae5aa5
+    tools_timer_load_state_af1f7a81 -->|calls| tools_timer_cmd_stop_9a86b9e8
+    tools_timer_load_state_af1f7a81 -->|calls| tools_timer_cmd_cancel_c9167ee9
+    tools_timer_load_state_af1f7a81 -->|calls| tools_timer_cmd_status_5199f367
+    tools_timer_load_state_af1f7a81 -->|calls| tools_timer_cmd_pause_9049d219
+    tools_timer_load_state_af1f7a81 -->|calls| tools_timer_cmd_continue_ae5aea29
+    tools_timer_save_state_806802e6 -->|calls| tools_timer_cmd_start_1eae5aa5
+    tools_timer_save_state_806802e6 -->|calls| tools_timer_cmd_pause_9049d219
+    tools_timer_save_state_806802e6 -->|calls| tools_timer_cmd_continue_ae5aea29
+    tools_timer_clear_state_af83f55d -->|calls| tools_timer_cmd_stop_9a86b9e8
+    tools_timer_clear_state_af83f55d -->|calls| tools_timer_cmd_cancel_c9167ee9
+    tools_timer_get_elapsed_cf007a73 -->|calls| tools_timer_cmd_start_1eae5aa5
+    tools_timer_get_elapsed_cf007a73 -->|calls| tools_timer_cmd_stop_9a86b9e8
+    tools_timer_get_elapsed_cf007a73 -->|calls| tools_timer_cmd_cancel_c9167ee9
+    tools_timer_get_elapsed_cf007a73 -->|calls| tools_timer_cmd_status_5199f367
+    tools_timer_detect_project_3b16be08 -->|calls| tools_timer_cmd_start_1eae5aa5
+    tools_timer_detect_project_3b16be08 -->|calls| tools_timer_cmd_stop_9a86b9e8
+    tools_timer_detect_branch_580d8716 -->|calls| tools_timer_cmd_start_1eae5aa5
+    tools_timer_detect_branch_580d8716 -->|calls| tools_timer_cmd_stop_9a86b9e8
+    tools_timer_detect_commit_msg_ac777710 -->|calls| tools_timer_cmd_start_1eae5aa5
+    tools_timer_get_day_name_3728430b -->|calls| tools_timer_append_entry_b15f7218
+    tools_timer_find_next_row_70bb9e3c -->|calls| tools_timer_append_entry_b15f7218
+    tools_timer_append_entry_b15f7218 -->|calls| tools_timer_cmd_stop_9a86b9e8
+    tools_timer_get_duration_cfed123a -->|calls| tools_timer_cmd_today_ac5e162b
+    %% Omitted for readability: 10 nodes, 0 edges
+    class tools_timer_load_state_af1f7a81 function;
+    class tools_timer_get_elapsed_cf007a73 function;
+    class tools_timer_save_state_806802e6 function;
+    class tools_timer_clear_state_af83f55d function;
+    class tools_timer_detect_branch_580d8716 function;
+    class tools_timer_detect_project_3b16be08 function;
+    class tools_timer_cmd_start_1eae5aa5 function;
+    class tools_timer_cmd_stop_9a86b9e8 function;
+    class tools_timer_cmd_cancel_c9167ee9 function;
+    class tools_timer_cmd_status_5199f367 function;
+    class tools_timer_cmd_pause_9049d219 function;
+    class tools_timer_cmd_continue_ae5aea29 function;
+    class tools_timer_detect_commit_msg_ac777710 function;
+    class tools_timer_get_day_name_3728430b function;
+    class tools_timer_append_entry_b15f7218 function;
+    class tools_timer_find_next_row_70bb9e3c function;
+    class tools_timer_get_duration_cfed123a function;
+    class tools_timer_cmd_today_ac5e162b function;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>timer.py</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>load_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_cancel()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_continue()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_pause()</code><br><small style="color:var(--muted)">tools/timer.py</small><br>+3 more</td>
+  <td>load_state() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>save_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_continue()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_pause()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_start()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>save_state() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>clear_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_cancel()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_stop()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>clear_state() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>get_elapsed()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_cancel()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_start()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_status()</code><br><small style="color:var(--muted)">tools/timer.py</small><br>+1 more</td>
+  <td>get_elapsed() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>detect_project()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_start()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_stop()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>detect_project() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>detect_branch()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_start()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_stop()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>detect_branch() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>detect_commit_msg()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_start()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>detect_commit_msg() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>get_day_name()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>append_entry()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>get_day_name() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>find_next_row()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>append_entry()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>find_next_row() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>append_entry()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>find_next_row()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>get_day_name()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><code>cmd_stop()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>append_entry() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>cmd_start()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>detect_branch()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>detect_commit_msg()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>detect_project()</code><br><small style="color:var(--muted)">tools/timer.py</small><br>+3 more</td>
+  <td>No direct outbound edge</td>
+  <td>cmd_start() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>cmd_stop()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>append_entry()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>clear_state()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>detect_branch()</code><br><small style="color:var(--muted)">tools/timer.py</small><br>+3 more</td>
+  <td>No direct outbound edge</td>
+  <td>cmd_stop() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>cmd_cancel()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>clear_state()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>get_elapsed()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>load_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>cmd_cancel() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>cmd_status()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>get_elapsed()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>load_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>cmd_status() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td><code>cmd_pause()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>load_state()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>save_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>cmd_pause() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>17</td>
+  <td><code>cmd_continue()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>load_state()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>save_state()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>cmd_continue() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>18</td>
+  <td><code>get_duration()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>cmd_today()</code><br><small style="color:var(--muted)">tools/timer.py</small><br><code>cmd_week()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>get_duration() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>19</td>
+  <td><code>cmd_today()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>get_duration()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>cmd_today() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>20</td>
+  <td><code>cmd_week()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>get_duration()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>cmd_week() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>21</td>
+  <td><code>cmd_pomo()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>countdown()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>cmd_pomo() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>22</td>
+  <td><code>countdown()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>cmd_pomo()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td>No direct outbound edge</td>
+  <td>countdown() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>23</td>
+  <td><code>main()</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>main() node in tools/timer.py.</td>
+</tr>
+<tr>
+  <td>24</td>
+  <td><code>Get total elapsed seconds from state. Works with paused or running state.</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Get total elapsed seconds from state. Works with paused or running state..</td>
+</tr>
+<tr>
+  <td>25</td>
+  <td><code>Find first empty row in Time Entries (col A check).</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Find first empty row in Time Entries (col A check)..</td>
+</tr>
+<tr>
+  <td>26</td>
+  <td><code>Append one row to Time Entries sheet and save.</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Append one row to Time Entries sheet and save..</td>
+</tr>
+<tr>
+  <td>27</td>
+  <td><code>Get numeric duration from row. Computes from start/end if formula not evaluated.</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Get numeric duration from row. Computes from start/end if formula not evaluated..</td>
+</tr>
+<tr>
+  <td>28</td>
+  <td><code>Countdown timer with progress display.</code><br><small style="color:var(--muted)">tools/timer.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Countdown timer with progress display..</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/timer.py</code></td><td>28 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: calls x26, contains x22, explains x5. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 5. Community 1 ====== -->
+<h2 id="community-1">5. Community 1</h2>
+<p>Community 1 groups implementation around how, usemd, bước, hướng, mostly in how_to_use.md. This section covers 18 nodes and 17 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 1 (18 nodes, 17 edges)
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210("Worklog.xlsx — Hướng dẫn sử dụng<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_s_d_ng_timer_n_t_b_m_gi_ea5196cb("Sử dụng Timer (Nút bấm giờ)<br/><small>how_to_use.md</small>")
+    how_to_use_md_29d4e2b9("how_to_use.md")
+    worklog_how_to_use_b_c_2_ghi_nh_t_k_trong_time_e_2c651482("Bước 2: Ghi nhật ký trong Time Entries<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_kh_i_t_o_l_i_workbook_a222d251("Khởi tạo lại workbook<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_validate_gamification_4659ce1a("Validate &amp; Gamification<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_5_b_ng_t_nh_bee327f9("5 Bảng Tính<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_b_c_1_thi_t_l_p_kpis_l_m_m_t_a7e5c38f("Bước 1: Thiết lập KPIs (làm một lần)<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_b_c_3_xem_weekly_summary_56a45447("Bước 3: Xem Weekly Summary<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_b_c_4_xem_daily_detail_873325d9("Bước 4: Xem Daily Detail<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_b_c_5_monthly_performance_9db34797("Bước 5: Monthly Performance<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_c_ch_d_ng_n_t_timer_9fcdbefa("Cách dùng nút Timer<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_c_t_ph_n_245d73aa("Cột phụ (ẩn)<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_h_ng_d_n_import_vba_n_u_d_ng_659e258c("Hướng dẫn Import VBA (nếu dùng file .xlsx)<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_m_o_hay_58a9150d("Mẹo Hay<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_y_u_c_u_2cefbe7c("Yêu cầu<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_codeblock_4_ac897954("code:bash ( Kiểm tra dữ liệu hợp lệ)<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_codeblock_5_e945aabc("code:bash ( Xây lại workbook + seed dữ...<br/><small>how_to_use.md</small>")
+    how_to_use_md_29d4e2b9 -->|contains| worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_5_b_ng_t_nh_bee327f9
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_b_c_1_thi_t_l_p_kpis_l_m_m_t_a7e5c38f
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_b_c_2_ghi_nh_t_k_trong_time_e_2c651482
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_s_d_ng_timer_n_t_b_m_gi_ea5196cb
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_b_c_3_xem_weekly_summary_56a45447
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_b_c_4_xem_daily_detail_873325d9
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_b_c_5_monthly_performance_9db34797
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_validate_gamification_4659ce1a
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_kh_i_t_o_l_i_workbook_a222d251
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_m_o_hay_58a9150d
+    worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 -->|contains| worklog_how_to_use_y_u_c_u_2cefbe7c
+    worklog_how_to_use_b_c_2_ghi_nh_t_k_trong_time_e_2c651482 -->|contains| worklog_how_to_use_c_t_ph_n_245d73aa
+    worklog_how_to_use_s_d_ng_timer_n_t_b_m_gi_ea5196cb -->|contains| worklog_how_to_use_c_ch_d_ng_n_t_timer_9fcdbefa
+    worklog_how_to_use_s_d_ng_timer_n_t_b_m_gi_ea5196cb -->|contains| worklog_how_to_use_h_ng_d_n_import_vba_n_u_d_ng_659e258c
+    worklog_how_to_use_validate_gamification_4659ce1a -->|contains| worklog_how_to_use_codeblock_4_ac897954
+    worklog_how_to_use_kh_i_t_o_l_i_workbook_a222d251 -->|contains| worklog_how_to_use_codeblock_5_e945aabc
+    class worklog_how_to_use_worklog_xlsx_h_ng_d_n_s_d_ng_38496210 concept;
+    class worklog_how_to_use_s_d_ng_timer_n_t_b_m_gi_ea5196cb concept;
+    class how_to_use_md_29d4e2b9 concept;
+    class worklog_how_to_use_b_c_2_ghi_nh_t_k_trong_time_e_2c651482 concept;
+    class worklog_how_to_use_kh_i_t_o_l_i_workbook_a222d251 concept;
+    class worklog_how_to_use_validate_gamification_4659ce1a concept;
+    class worklog_how_to_use_5_b_ng_t_nh_bee327f9 concept;
+    class worklog_how_to_use_b_c_1_thi_t_l_p_kpis_l_m_m_t_a7e5c38f concept;
+    class worklog_how_to_use_b_c_3_xem_weekly_summary_56a45447 concept;
+    class worklog_how_to_use_b_c_4_xem_daily_detail_873325d9 concept;
+    class worklog_how_to_use_b_c_5_monthly_performance_9db34797 concept;
+    class worklog_how_to_use_c_ch_d_ng_n_t_timer_9fcdbefa concept;
+    class worklog_how_to_use_c_t_ph_n_245d73aa concept;
+    class worklog_how_to_use_h_ng_d_n_import_vba_n_u_d_ng_659e258c concept;
+    class worklog_how_to_use_m_o_hay_58a9150d concept;
+    class worklog_how_to_use_y_u_c_u_2cefbe7c concept;
+    class worklog_how_to_use_codeblock_4_ac897954 concept;
+    class worklog_how_to_use_codeblock_5_e945aabc concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>how_to_use.md</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing how_to_use.md.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>Worklog.xlsx — Hướng dẫn sử dụng</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Worklog.xlsx — Hướng dẫn sử dụng.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>5 Bảng Tính</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 5 Bảng Tính.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>Bước 1: Thiết lập KPIs (làm một lần)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Bước 1: Thiết lập KPIs (làm một lần).</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>Bước 2: Ghi nhật ký trong Time Entries</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Bước 2: Ghi nhật ký trong Time Entries.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>Cột phụ (ẩn)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Cột phụ (ẩn).</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>Sử dụng Timer (Nút bấm giờ)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Sử dụng Timer (Nút bấm giờ).</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>Cách dùng nút Timer</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Cách dùng nút Timer.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>Hướng dẫn Import VBA (nếu dùng file .xlsx)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Hướng dẫn Import VBA (nếu dùng file .xlsx).</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>Bước 3: Xem Weekly Summary</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Bước 3: Xem Weekly Summary.</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>Bước 4: Xem Daily Detail</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Bước 4: Xem Daily Detail.</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>Bước 5: Monthly Performance</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Bước 5: Monthly Performance.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>Validate &amp; Gamification</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Validate &amp; Gamification.</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>code:bash (# Kiểm tra dữ liệu hợp lệ)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:bash (# Kiểm tra dữ liệu hợp lệ).</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>Khởi tạo lại workbook</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Khởi tạo lại workbook.</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td><code>code:bash (# Xây lại workbook + seed dữ liệu mẫu)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:bash (# Xây lại workbook + seed dữ liệu mẫu).</td>
+</tr>
+<tr>
+  <td>17</td>
+  <td><code>Mẹo Hay</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Mẹo Hay.</td>
+</tr>
+<tr>
+  <td>18</td>
+  <td><code>Yêu cầu</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Yêu cầu.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>how_to_use.md</code></td><td>18 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x17. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 6. Community 2 ====== -->
+<h2 id="community-2">6. Community 2</h2>
+<p>Community 2 groups implementation around worklog, 2026, autoformulas, implementationmd, mostly in superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md. This section covers 15 nodes and 14 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 2 (15 nodes, 14 edges)
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1("Worklog Auto-formulas Implementation Plan<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_4da856d1("Task 3: Rewrite Weekly Summary with aut...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_c3688591("Task 4: Rewrite Daily Detail with formulas<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_ecc075e5("Task 5: Create Monthly performance sheet<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    docs_superpowers_plans_2026_07_13_worklog_autofo_832eb39d("2026-07-13-worklog-autoformulas-impleme...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_dd4f1226("Task 1: Add helper columns J-K to Time...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_0aa61e8c("Task 2: Create KPIs sheet<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_20f6d8af("Task 6: Formatting and polish<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_48382a3d("code:block2 (=SORT(UNIQUE(FILTER('Time...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_2e6ca9c5("code:block3 (=SORT(UNIQUE(FILTER('Time...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_e979b472("code:block4 (=FILTER('Time Entries'!F:G...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_8f53f1bf("code:block5 (Total Hours: =SUM(E4))<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_f7c3a821("code:block6 (=FILTER(KPIs!A:A,)<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_d4680c00("code:block7 (Total hours this month: =S...<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    plans_2026_07_13_worklog_autoformulas_implementa_249a0aab("code:python (import openpyxl)<br/><small>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small>")
+    docs_superpowers_plans_2026_07_13_worklog_autofo_832eb39d -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_dd4f1226
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_0aa61e8c
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_4da856d1
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_c3688591
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_ecc075e5
+    plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_20f6d8af
+    plans_2026_07_13_worklog_autoformulas_implementa_dd4f1226 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_249a0aab
+    plans_2026_07_13_worklog_autoformulas_implementa_4da856d1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_48382a3d
+    plans_2026_07_13_worklog_autoformulas_implementa_4da856d1 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_2e6ca9c5
+    plans_2026_07_13_worklog_autoformulas_implementa_c3688591 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_e979b472
+    plans_2026_07_13_worklog_autoformulas_implementa_c3688591 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_8f53f1bf
+    plans_2026_07_13_worklog_autoformulas_implementa_ecc075e5 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_f7c3a821
+    plans_2026_07_13_worklog_autoformulas_implementa_ecc075e5 -->|contains| plans_2026_07_13_worklog_autoformulas_implementa_d4680c00
+    class plans_2026_07_13_worklog_autoformulas_implementa_fb6a62f1 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_4da856d1 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_c3688591 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_ecc075e5 concept;
+    class docs_superpowers_plans_2026_07_13_worklog_autofo_832eb39d concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_dd4f1226 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_0aa61e8c concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_20f6d8af concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_48382a3d concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_2e6ca9c5 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_e979b472 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_8f53f1bf concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_f7c3a821 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_d4680c00 concept;
+    class plans_2026_07_13_worklog_autoformulas_implementa_249a0aab concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>2026-07-13-worklog-autoformulas-implementation.md</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 2026-07-13-worklog-autoformulas-implementation.md.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>Worklog Auto-formulas Implementation Plan</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Worklog Auto-formulas Implementation Plan.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>Task 1: Add helper columns J-K to Time Entries</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Task 1: Add helper columns J-K to Time Entries.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>code:python (import openpyxl)</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:python (import openpyxl).</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>Task 2: Create KPIs sheet</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Task 2: Create KPIs sheet.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>Task 3: Rewrite Weekly Summary with auto-formulas</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Task 3: Rewrite Weekly Summary with auto-formulas.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>code:block2 (=SORT(UNIQUE(FILTER(&#x27;Time Entries&#x27;!J:J&amp;&quot;: &quot;&amp;&#x27;Time Entries&#x27;!K)</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block2 (=SORT(UNIQUE(FILTER(&#x27;Time Entries&#x27;!J:J&amp;&quot;: &quot;&amp;&#x27;Time Entries&#x27;!K).</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>code:block3 (=SORT(UNIQUE(FILTER(&#x27;Time Entries&#x27;!J:J,)</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block3 (=SORT(UNIQUE(FILTER(&#x27;Time Entries&#x27;!J:J,).</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>Task 4: Rewrite Daily Detail with formulas</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Task 4: Rewrite Daily Detail with formulas.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>code:block4 (=FILTER(&#x27;Time Entries&#x27;!F:G&amp;&quot;-&quot;&amp;&#x27;Time Entries&#x27;!G:G, &#x27;Time Ent)</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block4 (=FILTER(&#x27;Time Entries&#x27;!F:G&amp;&quot;-&quot;&amp;&#x27;Time Entries&#x27;!G:G, &#x27;Time Ent).</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>code:block5 (Total Hours: =SUM(E4#))</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block5 (Total Hours: =SUM(E4#)).</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>Task 5: Create Monthly performance sheet</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Task 5: Create Monthly performance sheet.</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>code:block6 (=FILTER(KPIs!A:A,)</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block6 (=FILTER(KPIs!A:A,).</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>code:block7 (Total hours this month: =SUM(C3#))</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block7 (Total hours this month: =SUM(C3#)).</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>Task 6: Formatting and polish</code><br><small style="color:var(--muted)">superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Task 6: Formatting and polish.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>superpowers/plans/2026-07-13-worklog-autoformulas-implementation.md</code></td><td>15 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x14. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 7. Community 3 ====== -->
+<h2 id="community-3">7. Community 3</h2>
+<p>Community 3 groups implementation around 2026, worklog, autoformulas, designmd, mostly in superpowers/specs/2026-07-13-worklog-autoformulas-design.md. This section covers 15 nodes and 14 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 3 (15 nodes, 14 edges)
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9("Sheets<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_wor_13153985("Worklog Auto-formulas Design<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    docs_superpowers_specs_2026_07_13_worklog_autofo_5d41b9ec("2026-07-13-worklog-autoformulas-design.md")
+    specs_2026_07_13_worklog_autoformulas_design_3_w_961171a0("3. Weekly Summary (revamped — fully aut...<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_4_d_f465d1de("4. Daily Detail (revamped — fully auto-...<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_5_m_28a9998d("5. Monthly (new — performance sheet)<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_0_d_3fa59b36("0. Data Normalization (helper columns i...<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_1_t_74eea8d3("1. Time Entries (minimal change)<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_2_k_d64fccf8("2. KPIs (new sheet)<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_aut_15282aaf("Auto-population Logic<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_ove_28043a4b("Overview<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_per_d53ba870("Performance Calculation Rules<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_cod_95e7b6e1("code:block1 (Row 1: Week label (e.g. 'W...<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_cod_6fd1e5eb("code:block2 (Cell A1: date input (defau...<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    specs_2026_07_13_worklog_autoformulas_design_cod_56ec55f6("code:block3 (Cell A1: Month label (e.g....<br/><small>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small>")
+    docs_superpowers_specs_2026_07_13_worklog_autofo_5d41b9ec -->|contains| specs_2026_07_13_worklog_autoformulas_design_wor_13153985
+    specs_2026_07_13_worklog_autoformulas_design_wor_13153985 -->|contains| specs_2026_07_13_worklog_autoformulas_design_ove_28043a4b
+    specs_2026_07_13_worklog_autoformulas_design_wor_13153985 -->|contains| specs_2026_07_13_worklog_autoformulas_design_she_410d91d9
+    specs_2026_07_13_worklog_autoformulas_design_wor_13153985 -->|contains| specs_2026_07_13_worklog_autoformulas_design_per_d53ba870
+    specs_2026_07_13_worklog_autoformulas_design_wor_13153985 -->|contains| specs_2026_07_13_worklog_autoformulas_design_aut_15282aaf
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 -->|contains| specs_2026_07_13_worklog_autoformulas_design_0_d_3fa59b36
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 -->|contains| specs_2026_07_13_worklog_autoformulas_design_1_t_74eea8d3
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 -->|contains| specs_2026_07_13_worklog_autoformulas_design_2_k_d64fccf8
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 -->|contains| specs_2026_07_13_worklog_autoformulas_design_3_w_961171a0
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 -->|contains| specs_2026_07_13_worklog_autoformulas_design_4_d_f465d1de
+    specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 -->|contains| specs_2026_07_13_worklog_autoformulas_design_5_m_28a9998d
+    specs_2026_07_13_worklog_autoformulas_design_3_w_961171a0 -->|contains| specs_2026_07_13_worklog_autoformulas_design_cod_95e7b6e1
+    specs_2026_07_13_worklog_autoformulas_design_4_d_f465d1de -->|contains| specs_2026_07_13_worklog_autoformulas_design_cod_6fd1e5eb
+    specs_2026_07_13_worklog_autoformulas_design_5_m_28a9998d -->|contains| specs_2026_07_13_worklog_autoformulas_design_cod_56ec55f6
+    class specs_2026_07_13_worklog_autoformulas_design_she_410d91d9 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_wor_13153985 concept;
+    class docs_superpowers_specs_2026_07_13_worklog_autofo_5d41b9ec concept;
+    class specs_2026_07_13_worklog_autoformulas_design_3_w_961171a0 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_4_d_f465d1de concept;
+    class specs_2026_07_13_worklog_autoformulas_design_5_m_28a9998d concept;
+    class specs_2026_07_13_worklog_autoformulas_design_0_d_3fa59b36 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_1_t_74eea8d3 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_2_k_d64fccf8 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_aut_15282aaf concept;
+    class specs_2026_07_13_worklog_autoformulas_design_ove_28043a4b concept;
+    class specs_2026_07_13_worklog_autoformulas_design_per_d53ba870 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_cod_95e7b6e1 concept;
+    class specs_2026_07_13_worklog_autoformulas_design_cod_6fd1e5eb concept;
+    class specs_2026_07_13_worklog_autoformulas_design_cod_56ec55f6 concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>2026-07-13-worklog-autoformulas-design.md</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 2026-07-13-worklog-autoformulas-design.md.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>Worklog Auto-formulas Design</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Worklog Auto-formulas Design.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>Overview</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Overview.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>Sheets</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Sheets.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>0. Data Normalization (helper columns in Time Entries)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 0. Data Normalization (helper columns in Time Entries).</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>1. Time Entries (minimal change)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 1. Time Entries (minimal change).</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>2. KPIs (new sheet)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 2. KPIs (new sheet).</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>3. Weekly Summary (revamped — fully auto-populated)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 3. Weekly Summary (revamped — fully auto-populated).</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>code:block1 (Row 1: Week label (e.g. &quot;Week 27 (Jun 29 - Jul 05, 2026)&quot;))</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block1 (Row 1: Week label (e.g. &quot;Week 27 (Jun 29 - Jul 05, 2026)&quot;)).</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>4. Daily Detail (revamped — fully auto-populated)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 4. Daily Detail (revamped — fully auto-populated).</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td><code>code:block2 (Cell A1: date input (default: =MAX(&#x27;Time Entries&#x27;!A:A) — lat)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block2 (Cell A1: date input (default: =MAX(&#x27;Time Entries&#x27;!A:A) — lat).</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td><code>5. Monthly (new — performance sheet)</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing 5. Monthly (new — performance sheet).</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td><code>code:block3 (Cell A1: Month label (e.g. &quot;July 2026&quot;) derived from latest )</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block3 (Cell A1: Month label (e.g. &quot;July 2026&quot;) derived from latest ).</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td><code>Performance Calculation Rules</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Performance Calculation Rules.</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td><code>Auto-population Logic</code><br><small style="color:var(--muted)">superpowers/specs/2026-07-13-worklog-autoformulas-design.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Auto-population Logic.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>superpowers/specs/2026-07-13-worklog-autoformulas-design.md</code></td><td>15 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x14. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 8. Community 4 ====== -->
+<h2 id="community-4">8. Community 4</h2>
+<p>Community 4 groups implementation around gamifypy, tools, compute, gamify, mostly in tools/gamify.py. This section covers 10 nodes and 17 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 4 (10 nodes, 17 edges)
+    tools_gamify_compute_consistency_b910b8a0("compute_consistency()<br/><small>tools/gamify.py</small>")
+    tools_gamify_compute_daily_summary_06809617("compute_daily_summary()<br/><small>tools/gamify.py</small>")
+    tools_gamify_compute_scores_68119763("compute_scores()<br/><small>tools/gamify.py</small>")
+    tools_gamify_compute_task_performance_b8690e30("compute_task_performance()<br/><small>tools/gamify.py</small>")
+    tools_gamify_get_time_entries_f21e6ccf("get_time_entries()<br/><small>tools/gamify.py</small>")
+    tools_gamify_load_gamify_data_f65a1c00("load_gamify_data()<br/><small>tools/gamify.py</small>")
+    tools_gamify_run_259dc699("run()<br/><small>tools/gamify.py</small>")
+    tools_gamify_save_gamify_data_1077fb03("save_gamify_data()<br/><small>tools/gamify.py</small>")
+    tools_gamify_update_streak_b635f508("update_streak()<br/><small>tools/gamify.py</small>")
+    tools_gamify_py_6531f086("gamify.py")
+    tools_gamify_load_gamify_data_f65a1c00 -->|calls| tools_gamify_run_259dc699
+    tools_gamify_save_gamify_data_1077fb03 -->|calls| tools_gamify_run_259dc699
+    tools_gamify_get_time_entries_f21e6ccf -->|calls| tools_gamify_run_259dc699
+    tools_gamify_compute_daily_summary_06809617 -->|calls| tools_gamify_run_259dc699
+    tools_gamify_update_streak_b635f508 -->|calls| tools_gamify_run_259dc699
+    tools_gamify_compute_scores_68119763 -->|calls| tools_gamify_run_259dc699
+    tools_gamify_compute_consistency_b910b8a0 -->|calls| tools_gamify_run_259dc699
+    tools_gamify_compute_task_performance_b8690e30 -->|calls| tools_gamify_run_259dc699
+    class tools_gamify_compute_consistency_b910b8a0 function;
+    class tools_gamify_compute_daily_summary_06809617 function;
+    class tools_gamify_compute_scores_68119763 function;
+    class tools_gamify_compute_task_performance_b8690e30 function;
+    class tools_gamify_get_time_entries_f21e6ccf function;
+    class tools_gamify_load_gamify_data_f65a1c00 function;
+    class tools_gamify_run_259dc699 function;
+    class tools_gamify_save_gamify_data_1077fb03 function;
+    class tools_gamify_update_streak_b635f508 function;
+    class tools_gamify_py_6531f086 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>gamify.py</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>load_gamify_data()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>load_gamify_data() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>save_gamify_data()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>save_gamify_data() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>get_time_entries()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>get_time_entries() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>compute_daily_summary()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>compute_daily_summary() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>update_streak()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>update_streak() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>compute_scores()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>compute_scores() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>compute_consistency()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>compute_consistency() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><code>compute_task_performance()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td>compute_task_performance() node in tools/gamify.py.</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/gamify.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>compute_consistency()</code><br><small style="color:var(--muted)">tools/gamify.py</small><br><code>compute_daily_summary()</code><br><small style="color:var(--muted)">tools/gamify.py</small><br><code>compute_scores()</code><br><small style="color:var(--muted)">tools/gamify.py</small><br>+5 more</td>
+  <td>No direct outbound edge</td>
+  <td>run() node in tools/gamify.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/gamify.py</code></td><td>10 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x9, calls x8. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 9. Community 5 ====== -->
+<h2 id="community-5">9. Community 5</h2>
+<p>Community 5 groups implementation around how, usemd, codebash, làm, mostly in how_to_use.md. This section covers 8 nodes and 7 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 5 (8 nodes, 7 edges)
+    worklog_how_to_use_s_d_ng_cli_timer_khuy_n_d_ng_ad0bf355("Sử dụng CLI Timer (khuyên dùng thay vì...<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_l_nh_c_b_n_79775d72("Lệnh cơ bản<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_pomodoro_cb593da3("Pomodoro<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_xem_b_o_c_o_nhanh_eae3869d("Xem báo cáo nhanh<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_auto_detect_30778504("Auto-detect<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_codeblock_1_e37a22c9("code:bash ( Bắt đầu làm việc (dùng thư...<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_codeblock_3_728bcae1("code:bash ( 25 phút làm + 5 phút nghỉ...<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_codeblock_2_804dfe1a("code:bash ( Hôm nay đã làm gì?)<br/><small>how_to_use.md</small>")
+    worklog_how_to_use_s_d_ng_cli_timer_khuy_n_d_ng_ad0bf355 -->|contains| worklog_how_to_use_l_nh_c_b_n_79775d72
+    worklog_how_to_use_s_d_ng_cli_timer_khuy_n_d_ng_ad0bf355 -->|contains| worklog_how_to_use_xem_b_o_c_o_nhanh_eae3869d
+    worklog_how_to_use_s_d_ng_cli_timer_khuy_n_d_ng_ad0bf355 -->|contains| worklog_how_to_use_pomodoro_cb593da3
+    worklog_how_to_use_s_d_ng_cli_timer_khuy_n_d_ng_ad0bf355 -->|contains| worklog_how_to_use_auto_detect_30778504
+    worklog_how_to_use_l_nh_c_b_n_79775d72 -->|contains| worklog_how_to_use_codeblock_1_e37a22c9
+    worklog_how_to_use_xem_b_o_c_o_nhanh_eae3869d -->|contains| worklog_how_to_use_codeblock_2_804dfe1a
+    worklog_how_to_use_pomodoro_cb593da3 -->|contains| worklog_how_to_use_codeblock_3_728bcae1
+    class worklog_how_to_use_s_d_ng_cli_timer_khuy_n_d_ng_ad0bf355 concept;
+    class worklog_how_to_use_l_nh_c_b_n_79775d72 concept;
+    class worklog_how_to_use_pomodoro_cb593da3 concept;
+    class worklog_how_to_use_xem_b_o_c_o_nhanh_eae3869d concept;
+    class worklog_how_to_use_auto_detect_30778504 concept;
+    class worklog_how_to_use_codeblock_1_e37a22c9 concept;
+    class worklog_how_to_use_codeblock_3_728bcae1 concept;
+    class worklog_how_to_use_codeblock_2_804dfe1a concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>Sử dụng CLI Timer (khuyên dùng thay vì gõ tay)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Sử dụng CLI Timer (khuyên dùng thay vì gõ tay).</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>Lệnh cơ bản</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Lệnh cơ bản.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>code:bash (# Bắt đầu làm việc (dùng thư mục git hiện tại))</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:bash (# Bắt đầu làm việc (dùng thư mục git hiện tại)).</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>Xem báo cáo nhanh</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Xem báo cáo nhanh.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>code:bash (# Hôm nay đã làm gì?)</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:bash (# Hôm nay đã làm gì?).</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>Pomodoro</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Pomodoro.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>code:bash (# 25 phút làm + 5 phút nghỉ (mặc định))</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:bash (# 25 phút làm + 5 phút nghỉ (mặc định)).</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>Auto-detect</code><br><small style="color:var(--muted)">how_to_use.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Auto-detect.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>how_to_use.md</code></td><td>8 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x7. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 10. Community 6 ====== -->
+<h2 id="community-6">10. Community 6</h2>
+<p>Community 6 groups implementation around readmemd, worklog, tính, năng, mostly in README.md. This section covers 8 nodes and 7 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 6 (8 nodes, 7 edges)
+    worklog_readme_worklog_8c9b8847("WorkLog<br/><small>README.md</small>")
+    readme_md_eeb98ce0("README.md")
+    worklog_readme_c_u_tr_c_th_m_c_6c08d0d0("Cấu trúc thư mục<br/><small>README.md</small>")
+    worklog_readme_quick_start_942601ba("Quick Start<br/><small>README.md</small>")
+    worklog_readme_t_nh_n_ng_51c05043("Tính năng<br/><small>README.md</small>")
+    worklog_readme_y_u_c_u_fd0b8f12("Yêu cầu<br/><small>README.md</small>")
+    worklog_readme_codeblock_1_b2a960e1("code:bash ( Build workbook + seed data...<br/><small>README.md</small>")
+    worklog_readme_codeblock_2_67646ecc("code:block2 (WorkLog/)<br/><small>README.md</small>")
+    readme_md_eeb98ce0 -->|contains| worklog_readme_worklog_8c9b8847
+    worklog_readme_worklog_8c9b8847 -->|contains| worklog_readme_t_nh_n_ng_51c05043
+    worklog_readme_worklog_8c9b8847 -->|contains| worklog_readme_quick_start_942601ba
+    worklog_readme_worklog_8c9b8847 -->|contains| worklog_readme_c_u_tr_c_th_m_c_6c08d0d0
+    worklog_readme_worklog_8c9b8847 -->|contains| worklog_readme_y_u_c_u_fd0b8f12
+    worklog_readme_quick_start_942601ba -->|contains| worklog_readme_codeblock_1_b2a960e1
+    worklog_readme_c_u_tr_c_th_m_c_6c08d0d0 -->|contains| worklog_readme_codeblock_2_67646ecc
+    class worklog_readme_worklog_8c9b8847 concept;
+    class readme_md_eeb98ce0 concept;
+    class worklog_readme_c_u_tr_c_th_m_c_6c08d0d0 concept;
+    class worklog_readme_quick_start_942601ba concept;
+    class worklog_readme_t_nh_n_ng_51c05043 concept;
+    class worklog_readme_y_u_c_u_fd0b8f12 concept;
+    class worklog_readme_codeblock_1_b2a960e1 concept;
+    class worklog_readme_codeblock_2_67646ecc concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>README.md</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing README.md.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>WorkLog</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing WorkLog.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>Tính năng</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Tính năng.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>Quick Start</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Quick Start.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>code:bash (# Build workbook + seed data mẫu)</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:bash (# Build workbook + seed data mẫu).</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>Cấu trúc thư mục</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Cấu trúc thư mục.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>code:block2 (WorkLog/)</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing code:block2 (WorkLog/).</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><code>Yêu cầu</code><br><small style="color:var(--muted)">README.md</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Documentation node describing Yêu cầu.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>README.md</code></td><td>8 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x7. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 11. Community 7 ====== -->
+<h2 id="community-7">11. Community 7</h2>
+<p>Community 7 groups implementation around validatepy, tools, missing, load, mostly in tools/validate.py. This section covers 7 nodes and 11 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 7 (7 nodes, 11 edges)
+    tools_validate_empty_rows_5a78603a("empty_rows()<br/><small>tools/validate.py</small>")
+    tools_validate_load_ws_8dbd0661("load_ws()<br/><small>tools/validate.py</small>")
+    tools_validate_missing_categories_134ff7e5("missing_categories()<br/><small>tools/validate.py</small>")
+    tools_validate_missing_descriptions_0f12dc06("missing_descriptions()<br/><small>tools/validate.py</small>")
+    tools_validate_utilization_gaps_fdfb61c4("utilization_gaps()<br/><small>tools/validate.py</small>")
+    tools_validate_run_b2e21017("run()<br/><small>tools/validate.py</small>")
+    tools_validate_py_116d7b19("validate.py")
+    tools_validate_load_ws_8dbd0661 -->|calls| tools_validate_run_b2e21017
+    tools_validate_empty_rows_5a78603a -->|calls| tools_validate_run_b2e21017
+    tools_validate_missing_descriptions_0f12dc06 -->|calls| tools_validate_run_b2e21017
+    tools_validate_missing_categories_134ff7e5 -->|calls| tools_validate_run_b2e21017
+    tools_validate_utilization_gaps_fdfb61c4 -->|calls| tools_validate_run_b2e21017
+    class tools_validate_empty_rows_5a78603a function;
+    class tools_validate_load_ws_8dbd0661 function;
+    class tools_validate_missing_categories_134ff7e5 function;
+    class tools_validate_missing_descriptions_0f12dc06 function;
+    class tools_validate_utilization_gaps_fdfb61c4 function;
+    class tools_validate_run_b2e21017 function;
+    class tools_validate_py_116d7b19 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>validate.py</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/validate.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>load_ws()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td>load_ws() node in tools/validate.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>empty_rows()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td>empty_rows() node in tools/validate.py.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><code>missing_descriptions()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td>missing_descriptions() node in tools/validate.py.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><code>missing_categories()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td>missing_categories() node in tools/validate.py.</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><code>utilization_gaps()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td>utilization_gaps() node in tools/validate.py.</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><code>run()</code><br><small style="color:var(--muted)">tools/validate.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td><code>empty_rows()</code><br><small style="color:var(--muted)">tools/validate.py</small><br><code>load_ws()</code><br><small style="color:var(--muted)">tools/validate.py</small><br><code>missing_categories()</code><br><small style="color:var(--muted)">tools/validate.py</small><br>+2 more</td>
+  <td>No direct outbound edge</td>
+  <td>run() node in tools/validate.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/validate.py</code></td><td>7 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x6, calls x5. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 12. Community 9 ====== -->
+<h2 id="community-9">12. Community 9</h2>
+<p>Community 9 groups implementation around vba, injectpy, inject, timer, mostly in vba/inject.py. This section covers 3 nodes and 2 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 9 (3 nodes, 2 edges)
+    vba_inject_py_e60e0f12("inject.py")
+    vba_inject_inject_vba_a1b2a3b2("inject_vba()<br/><small>vba/inject.py</small>")
+    vba_inject_rationale_1_6e778997("Inject timer button VBA into worklog.xl...<br/><small>vba/inject.py</small>")
+    vba_inject_py_e60e0f12 -->|contains| vba_inject_inject_vba_a1b2a3b2
+    vba_inject_py_e60e0f12 -->|explains| vba_inject_rationale_1_6e778997
+    class vba_inject_py_e60e0f12 module;
+    class vba_inject_inject_vba_a1b2a3b2 function;
+    class vba_inject_rationale_1_6e778997 concept;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>inject.py</code><br><small style="color:var(--muted)">vba/inject.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in vba/inject.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>inject_vba()</code><br><small style="color:var(--muted)">vba/inject.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>inject_vba() node in vba/inject.py.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>Inject timer button VBA into worklog.xlsm 1. Copies .xlsx -&gt; .xlsm 2. Adds VBA T</code><br><small style="color:var(--muted)">vba/inject.py</small></td>
+  <td><span class="tag tag-func">Concept</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Design note for Inject timer button VBA into worklog.xlsm 1. Copies .xlsx -&gt; .xlsm 2. Adds VBA T.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>vba/inject.py</code></td><td>3 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x1, explains x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 13. Community 10 ====== -->
+<h2 id="community-10">13. Community 10</h2>
+<p>Community 10 groups implementation around autopy, tools, mostly in tools/auto.py. This section covers 2 nodes and 1 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 10 (2 nodes, 1 edges)
+    tools_auto_py_c70e425f("auto.py")
+    tools_auto_main_3fb0534a("main()<br/><small>tools/auto.py</small>")
+    tools_auto_py_c70e425f -->|contains| tools_auto_main_3fb0534a
+    class tools_auto_py_c70e425f module;
+    class tools_auto_main_3fb0534a function;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>auto.py</code><br><small style="color:var(--muted)">tools/auto.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/auto.py.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>main()</code><br><small style="color:var(--muted)">tools/auto.py</small></td>
+  <td><span class="tag tag-func">Function</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>main() node in tools/auto.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/auto.py</code></td><td>2 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: contains x1. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 14. Community 12 ====== -->
+<h2 id="community-12">14. Community 12</h2>
+<p>Community 12 groups implementation around seedpy, tools, mostly in tools/seed.py. This section covers 1 nodes and 0 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 12 (1 nodes, 0 edges)
+    tools_seed_py_8c51091c("seed.py")
+    class tools_seed_py_8c51091c module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>seed.py</code><br><small style="color:var(--muted)">tools/seed.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/seed.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/seed.py</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: No high-confidence call edges detected. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<!-- ====== 15. Community 13 ====== -->
+<h2 id="community-13">15. Community 13</h2>
+<p>Community 13 groups implementation around tools, mostly in tools/__init__.py. This section covers 1 nodes and 0 internal edges; the diagram shows only representative relationships to stay readable.</p>
+
+<div class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "15.0px", "fontFamily": "Segoe UI, system-ui, sans-serif", "primaryColor": "#1e293b", "primaryTextColor": "#e2e8f0", "primaryBorderColor": "#38bdf8", "secondaryColor": "#0f172a", "tertiaryColor": "#334155", "lineColor": "#64748b", "textColor": "#e2e8f0"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 64, "padding": 14, "diagramPadding": 10, "useMaxWidth": true}}}%%
+flowchart LR
+    %% Section: Community 13 (1 nodes, 0 edges)
+    tools_init_py_331ff230("__init__.py")
+    class tools_init_py_331ff230 module;
+    classDef entry fill:#422006,stroke:#fbbf24,color:#fde68a,stroke-width:1px;
+    classDef api fill:#450a0a,stroke:#f87171,color:#fee2e2,stroke-width:1px;
+    classDef async fill:#2e1065,stroke:#a78bfa,color:#ede9fe,stroke-width:1px;
+    classDef klass fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:1px;
+    classDef ui fill:#831843,stroke:#f472b6,color:#fce7f3,stroke-width:1px;
+    classDef module fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:1px;
+    classDef test fill:#3f3f46,stroke:#a1a1aa,color:#f4f4f5,stroke-width:1px;
+    classDef concept fill:#292524,stroke:#a8a29e,color:#fafaf9,stroke-dasharray:4 3;
+    classDef function fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:1px;
+</div>
+
+<h3>Call Details</h3>
+<table class="call-table">
+<tr>
+  <th style="width:5%">#</th>
+  <th style="width:28%">Node</th>
+  <th style="width:10%">Type</th>
+  <th style="width:17%">Caller</th>
+  <th style="width:20%">Callees</th>
+  <th style="width:20%">Description</th>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>__init__.py</code><br><small style="color:var(--muted)">tools/__init__.py</small></td>
+  <td><span class="tag tag-class">Module</span></td>
+  <td>External entry / no inbound edge</td>
+  <td>No direct outbound edge</td>
+  <td>Module file in tools/__init__.py.</td>
+</tr>
+</table>
+
+<div class="grid">
+  <div class="card">
+    <h4>Key Files</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><th>File</th><th>Coverage</th></tr>
+      <tr><td><code>tools/__init__.py</code></td><td>1 nodes</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Design Notes</h4>
+    <p>This section comes from graphify community clustering. Relationship summary: No high-confidence call edges detected. The diagram prioritizes high-confidence calls or usage relationships; the table keeps the broader node inventory.</p>
+  </div>
+</div>
+<hr>
+
+<h2 id="stats">Project Statistics</h2>
+
+<div class="grid">
+  <div class="card">
+    <h4>Graph</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><td>Nodes</td><td>121</td></tr>
+      <tr><td>Edges</td><td>148</td></tr>
+      <tr><td>Hyperedges</td><td>0</td></tr>
+      <tr><td>Communities</td><td>14</td></tr>
+      <tr><td>Documented Sections</td><td>14</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Edge Confidence</h4>
+    <table style="width:100%;font-size:0.85rem;">
+      <tr><td>EXTRACTED</td><td>148</td></tr>
+      <tr><td>INFERRED</td><td>0</td></tr>
+      <tr><td>AMBIGUOUS</td><td>0</td></tr>
+    </table>
+  </div>
+</div>
+
+<div style="text-align:center; padding:40px 0; color: var(--muted); font-size:0.9rem;">
+  <p>WorkLog — Architecture Documentation</p>
+  <p>Generated: 2026-07-17 06:50 UTC · graphify callflow-html</p>
+</div>
+
+</div><!-- .container -->
+
+<script>
+(function () {
+  const mermaidConfig = {
+    startOnLoad: false,
+    theme: 'dark',
+    securityLevel: 'loose',
+    flowchart: { htmlLabels: true, useMaxWidth: true },
+    themeVariables: {
+      primaryColor: '#1e293b',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#38bdf8',
+      secondaryColor: '#0f172a',
+      tertiaryColor: '#334155',
+      lineColor: '#64748b',
+      textColor: '#e2e8f0',
+    }
+  };
+
+  mermaid.initialize(mermaidConfig);
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function enhanceMermaidDiagrams() {
+    document.querySelectorAll('.mermaid').forEach((container) => {
+      if (container.dataset.zoomReady === 'true') return;
+      const svg = container.querySelector('svg');
+      if (!svg) return;
+
+      container.dataset.zoomReady = 'true';
+      container.classList.add('is-enhanced');
+
+      const viewport = document.createElement('div');
+      viewport.className = 'mermaid-viewport';
+      svg.parentNode.insertBefore(viewport, svg);
+      viewport.appendChild(svg);
+
+      const toolbar = document.createElement('div');
+      toolbar.className = 'mermaid-toolbar';
+      toolbar.innerHTML = [
+        '<button type="button" data-action="zoom-out" title="Zoom out">-</button>',
+        '<span class="zoom-level" data-role="level">100%</span>',
+        '<button type="button" data-action="zoom-in" title="Zoom in">+</button>',
+        '<button type="button" data-action="fit" title="Fit width">Fit</button>',
+        '<button type="button" data-action="reset" title="Reset view">Reset</button>'
+      ].join('');
+      container.insertBefore(toolbar, viewport);
+
+      const state = { scale: 1, x: 0, y: 0, dragging: false, startX: 0, startY: 0, originX: 0, originY: 0 };
+      const level = toolbar.querySelector('[data-role="level"]');
+
+      function applyTransform() {
+        svg.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+        level.textContent = `${Math.round(state.scale * 100)}%`;
+      }
+
+      function zoomBy(delta) {
+        state.scale = clamp(state.scale + delta, 0.25, 3);
+        applyTransform();
+      }
+
+      function reset() {
+        state.scale = 1;
+        state.x = 0;
+        state.y = 0;
+        applyTransform();
+      }
+
+      function fitWidth() {
+        const rawWidth = svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width
+          ? svg.viewBox.baseVal.width
+          : svg.getBoundingClientRect().width / state.scale;
+        if (!rawWidth) {
+          reset();
+          return;
+        }
+        state.scale = clamp((viewport.clientWidth - 48) / rawWidth, 0.25, 1.4);
+        state.x = 0;
+        state.y = 0;
+        applyTransform();
+      }
+
+      toolbar.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        if (action === 'zoom-in') zoomBy(0.15);
+        if (action === 'zoom-out') zoomBy(-0.15);
+        if (action === 'fit') fitWidth();
+        if (action === 'reset') reset();
+      });
+
+      viewport.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        zoomBy(event.deltaY < 0 ? 0.1 : -0.1);
+      }, { passive: false });
+
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        state.dragging = true;
+        state.startX = event.clientX;
+        state.startY = event.clientY;
+        state.originX = state.x;
+        state.originY = state.y;
+        viewport.classList.add('is-dragging');
+        viewport.setPointerCapture(event.pointerId);
+      });
+
+      viewport.addEventListener('pointermove', (event) => {
+        if (!state.dragging) return;
+        state.x = state.originX + event.clientX - state.startX;
+        state.y = state.originY + event.clientY - state.startY;
+        applyTransform();
+      });
+
+      function endDrag(event) {
+        if (!state.dragging) return;
+        state.dragging = false;
+        viewport.classList.remove('is-dragging');
+        if (viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      viewport.addEventListener('pointerup', endDrag);
+      viewport.addEventListener('pointercancel', endDrag);
+      applyTransform();
+    });
+  }
+
+  function renderMermaid() {
+    const result = mermaid.run
+      ? mermaid.run({ querySelector: '.mermaid' })
+      : Promise.resolve();
+    Promise.resolve(result)
+      .then(enhanceMermaidDiagrams)
+      .catch((error) => {
+        console.error('Mermaid render failed:', error);
+        enhanceMermaidDiagrams();
+      });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderMermaid);
+  } else {
+    renderMermaid();
+  }
+})();
+</script>
+
+</body>
+</html>
