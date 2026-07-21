@@ -38,10 +38,25 @@ WorkLog/
 │   ├── seed.py          # Dữ liệu mẫu
 │   ├── validate.py      # Kiểm tra dữ liệu
 │   ├── gamify.py        # Điểm/streak/level
-│   └── report.py        # Báo cáo tổng hợp
+│   ├── report.py        # Báo cáo tổng hợp
+│   ├── db.py            # SQLite backend (tùy chọn: WORKLOG_DB=sqlite)
+│   └── webhook.py       # Webhook notifications (tùy chọn: WORKLOG_WEBHOOK_URL)
 ├── vba/                 # Macro VBA
 └── docs/
 ```
+
+## Tính năng mới
+
+- **Break Tracking**: Ghi lại lý do và thời gian nghỉ khi pause timer (`pause -r meeting`)
+- **SQLite Backend**: Đồng bộ dữ liệu vào SQLite song song với Excel (`WORKLOG_DB=sqlite`)
+- **Webhook Notifications**: Tự động gửi thông báo qua webhook khi stop timer (`WORKLOG_WEBHOOK_URL`)
+
+## Biến môi trường
+
+| Biến | Mô tả |
+|------|-------|
+| `WORKLOG_DB` | `"sqlite"` để bật SQLite backend |
+| `WORKLOG_WEBHOOK_URL` | URL webhook (Slack/Discord) để nhận thông báo |
 
 ## Yêu cầu
 

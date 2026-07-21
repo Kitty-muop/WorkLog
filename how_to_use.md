@@ -31,8 +31,9 @@ File `worklog.xlsx` gồm 5 bảng. **Bạn chỉ cần gõ dữ liệu vào Tim
 | I | Giờ kết thúc | ✅ | `hh:mm` 24h |
 | J | Thời lượng (h) | ❌ | Tự động = `(I-H)×24` |
 | K | Mô tả | ✅ | Nội dung công việc |
+| L | Break Info | ❌ | `meeting(15m); lunch(30m)` — tự động khi dùng CLI |
 
-> Cột L-Q là cột phụ ẩn (truyền dữ liệu cho công thức) — không cần quan tâm.
+> Cột M-R là cột phụ ẩn (truyền dữ liệu cho công thức) — không cần quan tâm.
 
 ---
 
@@ -50,7 +51,7 @@ python -m tools.timer today
 python -m tools.timer week
 
 # Tạm dừng / tiếp tục / hủy / trạng thái
-python -m tools.timer pause
+python -m tools.timer pause -r meeting     # Pause + lý do (meeting, lunch, break, review...)
 python -m tools.timer continue
 python -m tools.timer cancel
 python -m tools.timer status
@@ -88,13 +89,47 @@ tasks -t "API Integration"              # Lọc theo tên
 
 ---
 
+## Break Tracking
+
+Khi `pause`, thêm `-r REASON` để ghi lại lý do nghỉ (meeting, lunch, break, review, context-switch, ...).  
+Các phiên nghỉ được ghi vào cột **Break Info** (L) trong Time Entries dạng `meeting(15m); lunch(30m)`.
+
+## SQLite Backend (tùy chọn)
+
+Đặt biến môi trường `WORKLOG_DB=sqlite` để tự động đồng bộ dữ liệu vào SQLite song song với Excel:
+
+```bash
+# PowerShell
+$env:WORKLOG_DB = "sqlite"
+python -m tools.timer start -p Backend -t "API Integration"
+python -m tools.timer stop -d "Xong"
+# Dữ liệu được ghi vào cả worklog.xlsx và ~/.worklog.db
+```
+
+Dùng `sqlite3 ~/.worklog.db` để truy vấn trực tiếp.
+
+## Webhook Notifications (tùy chọn)
+
+Đặt biến môi trường `WORKLOG_WEBHOOK_URL` để tự động gửi thông báo khi stop timer:
+
+```bash
+$env:WORKLOG_WEBHOOK_URL = "https://hooks.slack.com/services/xxx/yyy/zzz"
+python -m tools.timer stop -d "Xong feature"
+# POST JSON {project, task, duration_h, description, ...} đến webhook
+```
+
+Kiểm tra webhook:
+```bash
+python -m tools.timer webhook-test
+```
+
 ## Validate & Báo cáo
 
 ```bash
 python -m tools.validate          # Kiểm tra dữ liệu
 python -m tools.gamify            # Điểm/streak/level
 python -m tools.report            # Báo cáo tổng hợp
-python -m tools.auto              # Chạy tất cả
+python -m tools.auto              # Chạy tất cả (gồm init SQLite)
 ```
 
 ---

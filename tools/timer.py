@@ -23,6 +23,10 @@ from pathlib import Path
 import openpyxl
 from openpyxl import load_workbook
 
+sys.path.insert(0, str(Path(__file__).parent))
+import db
+import webhook
+
 STATE_FILE = Path.home() / '.worklog_timer.json'
 WORKLOG_FILE = 'worklog.xlsx'
 
@@ -119,7 +123,7 @@ def get_next_subtask_code(wb, father_task_code):
 
 
 def append_entry(project, task, subtask, subtask_code, category, description,
-                 start_dt, end_dt):
+                 start_dt, end_dt, break_info=None):
     """Append one row to Time Entries sheet and save."""
     wb = load_workbook(WORKLOG_FILE)
     ws = wb['Time Entries']
@@ -142,7 +146,11 @@ def append_entry(project, task, subtask, subtask_code, category, description,
     ws.cell(r, 9).number_format = 'hh:mm'
     ws.cell(r, 10).value = f'=IF(AND(H{r}<>"",I{r}<>""),(I{r}-H{r})*24,"")'
     ws.cell(r, 11).value = description or ''
-    # Helper cols L-Q: let formulas auto-propagate (leave blank, formulas fill)
+    ws.cell(r, 12).value = break_info or ''
+    # Helper cols M-R: let formulas auto-propagate (leave blank, formulas fill)
+
+    db.insert_entry(project, task, subtask, subtask_code, category, description,
+                    start_dt, end_dt, break_info or '')
 
     wb.save(WORKLOG_FILE)
     print(f"  Written to {WORKLOG_FILE} (row {r})")
@@ -205,6 +213,29 @@ def cmd_stop(args):
     else:
         start_dt = now - datetime.timedelta(seconds=acc)
 
+    # Close any open pause
+    pause_log = state.get('pause_log', [])
+    if state.get('paused', False):
+        pause_start = datetime.datetime.fromisoformat(state['segment_start'])
+        pause_duration = (now - pause_start).total_seconds() / 60
+        reason = state.get('pause_reason', 'break')
+        pause_log.append({
+            'reason': reason,
+            'start': pause_start.isoformat(),
+            'end': now.isoformat(),
+            'duration_min': int(pause_duration)
+        })
+
+    # Build break info string
+    break_info = ''
+    total_break_min = 0
+    if pause_log:
+        parts = []
+        for p in pause_log:
+            parts.append(f"{p['reason']}({p['duration_min']}m)")
+            total_break_min += p['duration_min']
+        break_info = '; '.join(parts)
+
     project = args.project or state.get('project') or detect_project() or input("Project: ")
     task = args.task or state.get('task') or detect_branch() or input("Father Task: ")
     subtask = args.subtask or state.get('subtask')
@@ -225,8 +256,16 @@ def cmd_stop(args):
         print(f"  Sub Task: {subtask}")
     print(f"  Category: {category}")
     print(f"  Desc:     {description}")
+    if break_info:
+        print(f"  Breaks:   {break_info}")
+        if total_break_min >= 60:
+            print(f"  Break total: {total_break_min}m ({total_break_min/60:.1f}h) off-task")
 
-    append_entry(project, task, subtask, subtask_code, category, description, start_dt, end_dt)
+    append_entry(project, task, subtask, subtask_code, category, description, start_dt, end_dt, break_info)
+    webhook.send(project=project, task=task, duration_h=duration,
+                 description=description, category=category, subtask=subtask,
+                 break_info=break_info,
+                 start_time=start_dt.strftime('%H:%M'), end_time=end_dt.strftime('%H:%M'))
     clear_state()
     return 0
 
@@ -253,7 +292,9 @@ def cmd_status(args):
     hours = mins / 60
 
     if state.get('paused', False):
+        reason = state.get('pause_reason', 'break')
         print(f"Timer PAUSED ({mins}m / {hours:.2f}h accumulated)")
+        print(f"  Reason: {reason}")
     else:
         sd = datetime.datetime.fromisoformat(state['segment_start'])
         print(f"Timer running: {sd.strftime('%H:%M:%S')} ({mins}m / {hours:.2f}h elapsed)")
@@ -280,10 +321,13 @@ def cmd_pause(args):
     state['accumulated_seconds'] = state.get('accumulated_seconds', 0) + elapsed
     state['segment_start'] = now.isoformat()
     state['paused'] = True
+    reason = args.reason if args.reason else 'break'
+    state['pause_reason'] = reason
     save_state(state)
 
     total = int(state['accumulated_seconds']) // 60
     print(f"Timer paused at {now.strftime('%H:%M:%S')} ({total}m accumulated)")
+    print(f"  Reason: {reason}")
     return 0
 
 
@@ -294,11 +338,25 @@ def cmd_continue(args):
         return 1
 
     now = datetime.datetime.now()
+    pause_start = datetime.datetime.fromisoformat(state['segment_start'])
+    pause_duration = (now - pause_start).total_seconds() / 60
+    reason = state.get('pause_reason', 'break')
+
+    pause_log = state.get('pause_log', [])
+    pause_log.append({
+        'reason': reason,
+        'start': pause_start.isoformat(),
+        'end': now.isoformat(),
+        'duration_min': int(pause_duration)
+    })
+    state['pause_log'] = pause_log
+    state['pause_reason'] = ''
+
     state['segment_start'] = now.isoformat()
     state['paused'] = False
     save_state(state)
 
-    print(f"Timer resumed at {now.strftime('%H:%M:%S')}")
+    print(f"Timer resumed at {now.strftime('%H:%M:%S')} ({int(pause_duration)}m {reason})")
     if state.get('project'):
         print(f"  Project: {state['project']}")
     if state.get('task'):
@@ -839,8 +897,10 @@ def main():
 
     sub.add_parser('cancel', help='Cancel running timer')
     sub.add_parser('status', help='Show timer status')
-    sub.add_parser('pause', help='Pause timer (break, meeting, lunch)')
+    p_pause = sub.add_parser('pause', help='Pause timer (break, meeting, lunch)')
+    p_pause.add_argument('-r', '--reason', help='Pause reason: meeting, lunch, break, review, context-switch, etc.')
     sub.add_parser('continue', help='Resume paused timer')
+    sub.add_parser('webhook-test', help='Send test webhook notification')
     sub.add_parser('today', help='Show today summary')
     sub.add_parser('week', help='Show this week summary')
 
@@ -912,6 +972,7 @@ def main():
         'kpi': cmd_kpi,
         'tasks': cmd_tasks,
         'subtask': cmd_subtask,
+        'webhook-test': webhook.send_test,
     }
     return cmds[args.cmd](args)
 

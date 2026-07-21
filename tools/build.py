@@ -56,60 +56,61 @@ ws_te.column_dimensions['H'].width = 11
 ws_te.column_dimensions['I'].width = 11
 ws_te.column_dimensions['J'].width = 12
 ws_te.column_dimensions['K'].width = 50
-ws_te.column_dimensions['L'].width = 15
-ws_te.column_dimensions['M'].width = 25
-ws_te.column_dimensions['N'].width = 30
-ws_te.column_dimensions['O'].width = 8
+ws_te.column_dimensions['L'].width = 30
+ws_te.column_dimensions['M'].width = 15
+ws_te.column_dimensions['N'].width = 25
+ws_te.column_dimensions['O'].width = 30
 ws_te.column_dimensions['P'].width = 8
 ws_te.column_dimensions['Q'].width = 8
+ws_te.column_dimensions['R'].width = 8
 
-for c_letter in ['L', 'M', 'N', 'O', 'P', 'Q']:
+for c_letter in ['M', 'N', 'O', 'P', 'Q', 'R']:
     ws_te.column_dimensions[c_letter].hidden = True
 
 headers_te = ['Date', 'Day', 'Project', 'Father Task', 'Sub Task', 'Sub Task Code', 'Category',
-              'Start Time', 'End Time', 'Duration (h)', 'Description']
+              'Start Time', 'End Time', 'Duration (h)', 'Description', 'Break Info']
 for i, h in enumerate(headers_te, 1):
     ws_te.cell(row=1, column=i, value=h)
-style_header(ws_te, 1, 11)
+style_header(ws_te, 1, 12)
 
 # Helper column formulas (rows 2..MAX_DATA_ROWS+1)
 for r in range(2, MAX_DATA_ROWS + 2):
-    # L: Project norm
+    prev_row = r - 1
+    # M: Project norm
     if r == 2:
-        ws_te.cell(row=r, column=12).value = '=IF(C2<>"",C2,"")'
+        ws_te.cell(row=r, column=13).value = '=IF(C2<>"",C2,"")'
     else:
-        ws_te.cell(row=r, column=12).value = f'=IF(C{r}<>"",C{r},L{r-1})'
+        ws_te.cell(row=r, column=13).value = f'=IF(C{r}<>"",C{r},M{prev_row})'
 
-    # M: Father Task norm
+    # N: Father Task norm
     if r == 2:
-        ws_te.cell(row=r, column=13).value = '=IF(D2<>"",D2,"")'
+        ws_te.cell(row=r, column=14).value = '=IF(D2<>"",D2,"")'
     else:
-        ws_te.cell(row=r, column=13).value = f'=IF(D{r}<>"",D{r},M{r-1})'
+        ws_te.cell(row=r, column=14).value = f'=IF(D{r}<>"",D{r},N{prev_row})'
 
-    # N: Project:Task combined
-    ws_te.cell(row=r, column=14).value = f'=L{r}&": "&M{r}'
+    # O: Project:Task combined
+    ws_te.cell(row=r, column=15).value = f'=M{r}&": "&N{r}'
 
-    # O: Unique task ID (for Weekly Summary)
+    # P: Unique task ID (for Weekly Summary)
     if r == 2:
-        ws_te.cell(row=r, column=15).value = (
-            '=IF(N2="","",IF(COUNTIF($N$1:N1,N2)=0,MAX($O$1:O1)+1,""))'
+        ws_te.cell(row=r, column=16).value = (
+            '=IF(O2="","",IF(COUNTIF($O$1:O1,O2)=0,MAX($P$1:P1)+1,""))'
         )
     else:
-        prev_row = r - 1
-        ws_te.cell(row=r, column=15).value = (
-            f'=IF(N{r}="","",IF(COUNTIF($N$1:N{prev_row},N{r})=0,MAX($O$1:O{prev_row})+1,""))'
+        ws_te.cell(row=r, column=16).value = (
+            f'=IF(O{r}="","",IF(COUNTIF($O$1:O{prev_row},O{r})=0,MAX($P$1:P{prev_row})+1,""))'
         )
 
-    # P: Date row number (for Daily Detail)
-    ws_te.cell(row=r, column=16).value = (
+    # Q: Date row number (for Daily Detail)
+    ws_te.cell(row=r, column=17).value = (
         f'=IF(A{r}="","",COUNTIF($A$2:A{r},A{r}))'
     )
 
-    # Q: Sequential entry number
+    # R: Sequential entry number
     if r == 2:
-        ws_te.cell(row=r, column=17).value = '=IF(A2="","",1)'
+        ws_te.cell(row=r, column=18).value = '=IF(A2="","",1)'
     else:
-        ws_te.cell(row=r, column=17).value = f'=IF(A{r}="","",MAX($Q$1:Q{prev_row})+1)'
+        ws_te.cell(row=r, column=18).value = f'=IF(A{r}="","",MAX($R$1:R{prev_row})+1)'
 
 # Duration formula (col J)
 for r in range(2, MAX_DATA_ROWS + 2):
@@ -126,7 +127,7 @@ for r in range(2, MAX_DATA_ROWS + 2):
 
 # Data validation for Status (col F) — not applicable here, but keep for KPIs
 ws_te.freeze_panes = 'A2'
-ws_te.auto_filter.ref = f'A1:K{MAX_DATA_ROWS + 1}'
+ws_te.auto_filter.ref = f'A1:L{MAX_DATA_ROWS + 1}'
 
 print("Sheet 1 done: Time Entries with WPS-compatible helpers")
 
@@ -232,20 +233,20 @@ for r in range(ws_start, ws_start + WS_ROWS):
     row_offset = r - ws_start + 1
     # A: Task name (from unique task list)
     ws_ws.cell(row=r, column=1).value = (
-        f"=IFERROR(INDEX('Time Entries'!$N:$N,MATCH(ROW()-{ws_start-1},"
-        f"'Time Entries'!$O:$O,0)),\"\")"
+        f"=IFERROR(INDEX('Time Entries'!$O:$O,MATCH(ROW()-{ws_start-1},"
+        f"'Time Entries'!$P:$P,0)),\"\")"
     )
     # B: Category
     ws_ws.cell(row=r, column=2).value = (
         f'=IF($A{r}="","",IFERROR(INDEX(\'Time Entries\'!G:G,'
-        f'MATCH($A{r},\'Time Entries\'!$N:$N,0)),""))'
+        f'MATCH($A{r},\'Time Entries\'!$O:$O,0)),""))'
     )
     # C-I: Hours per day
     for i in range(7):
         col = 3 + i
         date_ref_col = get_column_letter(15 + i)
         ws_ws.cell(row=r, column=col).value = (
-            f'=IF($A{r}="","",SUMIFS(\'Time Entries\'!J:J,\'Time Entries\'!N:N,$A{r},'
+            f'=IF($A{r}="","",SUMIFS(\'Time Entries\'!J:J,\'Time Entries\'!O:O,$A{r},'
             f"\'Time Entries\'!A:A,$O$4+{i}))"
         )
         ws_ws.cell(row=r, column=col).number_format = '0.00'
@@ -339,11 +340,11 @@ for r in range(dd_start, dd_start + DD_ROWS):
     )
     # B: Project
     ws_dd.cell(row=r, column=2).value = (
-        f'=IF($H{r}="","",IF(INDEX(\'Time Entries\'!G:G,$H{r})="","",INDEX(\'Time Entries\'!L:L,$H{r})))'
+        f'=IF($H{r}="","",IF(INDEX(\'Time Entries\'!G:G,$H{r})="","",INDEX(\'Time Entries\'!M:M,$H{r})))'
     )
     # C: Father Task
     ws_dd.cell(row=r, column=3).value = (
-        f'=IF($H{r}="","",IF(INDEX(\'Time Entries\'!G:G,$H{r})="","",INDEX(\'Time Entries\'!M:M,$H{r})))'
+        f'=IF($H{r}="","",IF(INDEX(\'Time Entries\'!G:G,$H{r})="","",INDEX(\'Time Entries\'!N:N,$H{r})))'
     )
     # D: Sub Task Code
     ws_dd.cell(row=r, column=4).value = (
@@ -477,7 +478,7 @@ for r in range(mo_start, mo_start + MO_ROWS):
 
     # D: Total Hours in this month
     ws_mo.cell(row=r, column=4).value = (
-        f'=IF($B{r}="","",SUMIFS(\'Time Entries\'!J:J,\'Time Entries\'!M:M,$B{r},'
+        f'=IF($B{r}="","",SUMIFS(\'Time Entries\'!J:J,\'Time Entries\'!N:N,$B{r},'
         f"\'Time Entries\'!A:A,\">=\"&$J$2,\'Time Entries\'!A:A,\"<=\"&$K$2))"
     )
     ws_mo.cell(row=r, column=4).number_format = '0.00'

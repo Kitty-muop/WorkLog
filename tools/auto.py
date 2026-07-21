@@ -10,9 +10,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import validate
 import gamify
+import db
 from report import run as run_report
 
 def main():
+    db.init()
     print("\n\x1b[1m=== WORKLOG AUTO-RUN ===\x1b[0m\n")
 
     print("--- Running validate.py ---")
