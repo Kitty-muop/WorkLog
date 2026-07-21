@@ -1,6 +1,8 @@
-# Hướng dẫn sử dụng WorkLog từ A-Z
+# WorkLog — Hướng dẫn đầy đủ theo Flow (Project → KPI → Sub Task → Timer)
 
-## 1. Cài đặt lần đầu
+---
+
+## 1. CÀI ĐẶT LẦN ĐẦU
 
 ```bash
 pip install openpyxl pandas
@@ -8,206 +10,399 @@ python -m tools.build
 python -m tools.seed
 ```
 
+Kết quả: tạo `worklog.xlsx` với 6 sheet, dữ liệu mẫu.
+
 ---
 
-## 2. Flow đầy đủ: Project → Father Task → Sub Task → Làm việc → Hoàn thành
+## 2. FLOW CHÍNH: Project → Father Task → Sub Task → Làm việc → Hoàn thành
 
-### 2.1. Tạo Project (dự án)
-
-Project là cấp cao nhất. Phải có project trước khi tạo KPI.
-
-```bash
-python -m tools.timer project add -n Backend -d "API development and maintenance"
+```
+                 ┌─────────────┐
+                 │  PROJECT    │  ← project add
+                 ├─────────────┤
+                 │  FATHER TASK│  ← kpi add (thuộc project)
+                 ├─────────────┤
+                 │  SUB TASK   │  ← start -s (tự động sinh code)
+                 ├─────────────┤
+                 │  TIME ENTRY │  ← stop (ghi vào Excel)
+                 └─────────────┘
 ```
 
-Kết quả: tạo project mã **PRJ-1**, trạng thái Active.
+---
 
+### 2.1. TẠO PROJECT
+
+**Lệnh:**
 ```bash
+python -m tools.timer project add -n "Backend" -d "API development"
+```
+
+| Payload | Ý nghĩa | Bắt buộc |
+|---------|---------|----------|
+| `-n`, `--name` | Tên project | ✅ |
+| `-d`, `--description` | Mô tả project | ❌ |
+
+**Dữ liệu ghi vào sheet Projects:**
+| Cột | Giá trị |
+|-----|---------|
+| A: Code | `PRJ-1` (tự động) |
+| B: Name | `Backend` |
+| C: Description | `API development` |
+| D: Status | `Active` |
+| E: Created Date | hôm nay |
+
+**Các lệnh khác:**
+```bash
+# Danh sách
 python -m tools.timer project list
+
+# Đổi tên (cập nhật KPIs + Time Entries)
+python -m tools.timer project rename -n "Backend" --new-name "Backend Services"
+
+# Archive (ẩn project cũ)
+python -m tools.timer project archive -n "Old Project"
 ```
 
-### 2.2. Tạo Father Task (mục tiêu lớn) trong Project
+---
 
+### 2.2. TẠO FATHER TASK (KPI) TRONG PROJECT
+
+**Lệnh:**
 ```bash
-python -m tools.timer kpi add -t "Xây dựng API Auth" -p Backend -d 3
+python -m tools.timer kpi add -t "API Auth" -p Backend -d 5
 ```
 
-Kết quả: tạo KPI với mã **PRJ-1-KPI-1** (scope trong project Backend), deadline 3 ngày.
+| Payload | Ý nghĩa | Bắt buộc |
+|---------|---------|----------|
+| `-t`, `--name` | Tên father task | ✅ |
+| `-p`, `--project` | Project chứa KPI này | ✅ (phải tồn tại) |
+| `-d`, `--deadline` | Hạn chót (số ngày), mặc định 7 | ❌ |
 
-> **Lưu ý**: Project `Backend` phải tồn tại trong Projects sheet. Nếu chưa có, thêm trước bằng `project add`.
+**Dữ liệu ghi vào sheet KPIs:**
+| Cột | Giá trị |
+|-----|---------|
+| A: Code | `PRJ-1-KPI-1` (tự động, scope theo project) |
+| B: Father Task | `API Auth` |
+| C: Project | `Backend` |
+| D: Date | hôm nay |
+| E: Deadline (days) | `5` |
+| F: Deadline (h) | `=E*7.5` (công thức) |
+| G: Status | `In Progress` |
+| H: Completed Date | (trống) |
 
-### 2.3. Tạo Sub Task (việc nhỏ)
-
-Sub task được tạo **tự động** khi bạn `start` với tham số `-s`:
-
+**Các lệnh khác:**
 ```bash
-python -m tools.timer start -p Backend -t "Xây dựng API Auth" -s "Login API" -c Development
+# Danh sách (group theo project)
+python -m tools.timer kpi list
+
+# Xem tiến độ (group theo project)
+python -m tools.timer kpi status
+
+# Sửa deadline
+python -m tools.timer kpi edit -t "API Auth" -d 10
+
+# Sửa project
+python -m tools.timer kpi edit -t "API Auth" -p Frontend
+
+# Đổi tên (cập nhật cả Time Entries)
+python -m tools.timer kpi rename -t "API Auth" -n "Authentication"
+
+# Đánh dấu hoàn thành
+python -m tools.timer kpi done -t "API Auth"
+
+# Xóa KPI
+python -m tools.timer kpi delete -t "API Auth"
 ```
 
-Mỗi lần start với `-s` mới, CLI tự động sinh mã **PRJ-1-KPI-1-ST-1**, **PRJ-1-KPI-1-ST-2**,...
+---
 
-> Cách này không cần lệnh tạo subtask riêng — cứ `start -s "Tên"` là có subtask mới.
+### 2.3. BẮT ĐẦU PHIÊN LÀM VIỆC
 
-### 2.3. Làm việc với timer
-
+**Lệnh:**
 ```bash
-# Bắt đầu phiên (đã có subtask)
-python -m tools.timer start -p Backend -t "Xây dựng API Auth" -s "Login API" -c Development
+python -m tools.timer start -p Backend -t "API Auth" -s "Login endpoint" -c Development -d "Implement JWT"
+```
 
-# Tạm dừng (nghỉ, họp...)
+| Payload | Ý nghĩa | Bắt buộc | Tự động nếu bỏ qua |
+|---------|---------|----------|-------------------|
+| `-p`, `--project` | Project | ❌ | Git folder name |
+| `-t`, `--task` | Father task | ❌ | Git branch name |
+| `-s`, `--subtask` | Sub task | ❌ | — |
+| `--subtask-code` | Sub task code (tự sinh nếu có -s) | ❌ | `PRJ1-KPI-1-ST-N` |
+| `-c`, `--category` | Danh mục | ❌ | `Development` |
+| `-d`, `--description` | Mô tả | ❌ | Git commit message |
+
+**Dữ liệu lưu vào state** (`~/.worklog_timer.json`):
+```json
+{
+  "accumulated_seconds": 0,
+  "segment_start": "2026-07-21T09:00:00",
+  "paused": false,
+  "project": "Backend",
+  "task": "API Auth",
+  "subtask": "Login endpoint",
+  "subtask_code": "PRJ-1-KPI-1-ST-1",
+  "category": "Development",
+  "description": "Implement JWT"
+}
+```
+
+---
+
+### 2.4. TẠM DỪNG (GIẢI LAO / HỌP)
+
+**Lệnh:**
+```bash
 python -m tools.timer pause -r meeting
+```
+
+| Payload | Ý nghĩa | Bắt buộc |
+|---------|---------|----------|
+| `-r`, `--reason` | Lý do nghỉ | ❌ (mặc định: `break`) |
+
+**Các lý do thường dùng:** `meeting`, `lunch`, `break`, `review`, `context-switch`, `phone`, `email`, `personal`
+
+**Tiếp tục:**
+```bash
 python -m tools.timer continue
-
-# Kết thúc phiên — ghi vào worklog.xlsx
-python -m tools.timer stop -d "Xong chức năng login, đã test JWT"
 ```
 
-### 2.4. Tiếp tục subtask cũ
+**Cách hoạt động:**
+- `pause` → ghi lại thời điểm bắt đầu nghỉ + lý do
+- `continue` → tính thời gian nghỉ (phút) + lưu vào `pause_log` trong state
+- `stop` → tổng hợp các phiên nghỉ thành chuỗi `meeting(15m); lunch(30m)` ghi vào cột L
 
+---
+
+### 2.5. KẾT THÚC PHIÊN
+
+**Lệnh:**
 ```bash
-# Làm tiếp subtask cũ (dùng đúng tên)
-python -m tools.timer start -p Backend -t "Xây dựng API Auth" -s "Login API" -c Development
-python -m tools.timer stop -d "Sửa lỗi refresh token"
+python -m tools.timer stop -d "Xong login API, đã test JWT"
 ```
 
-### 2.5. Thêm subtask mới
+| Payload | Ý nghĩa | Bắt buộc |
+|---------|---------|----------|
+| `-d`, `--description` | Mô tả công việc | ✅ (nếu chưa có ở start) |
+| `-p`, `--project` | Ghi đè project | ❌ |
+| `-t`, `--task` | Ghi đè father task | ❌ |
+| `-s`, `--subtask` | Ghi đè subtask | ❌ |
+| `-c`, `--category` | Ghi đè danh mục | ❌ |
 
-```bash
-# Tự động tạo subtask mới + mã mới (KPI-1-ST-2)
-python -m tools.timer start -p Backend -t "Xây dựng API Auth" -s "Logout API" -c Development
-python -m tools.timer stop -d "Hoàn thành logout"
+**Dữ liệu ghi vào sheet Time Entries:**
+| Cột | Giá trị |
+|-----|---------|
+| A: Date | `21-07-2026` |
+| B: Day | `Tue` |
+| C: Project | `Backend` |
+| D: Father Task | `API Auth` |
+| E: Sub Task | `Login endpoint` |
+| F: Sub Task Code | `PRJ-1-KPI-1-ST-1` |
+| G: Category | `Development` |
+| H: Start Time | `09:00` |
+| I: End Time | `11:30` |
+| J: Duration (h) | `=IF(AND(H<>'',I<>''),(I-H)*24,'')` |
+| K: Description | `Xong login API, đã test JWT` |
+| L: Break Info | `meeting(15m); lunch(30m)` |
+
+**Webhook payload** (nếu có `WORKLOG_WEBHOOK_URL`):
+```json
+{
+  "project": "Backend",
+  "task": "API Auth",
+  "duration_h": 2.5,
+  "duration_m": 150,
+  "description": "Xong login API, đã test JWT",
+  "category": "Development",
+  "subtask": "Login endpoint",
+  "break_info": "meeting(15m); lunch(30m)",
+  "start_time": "09:00",
+  "end_time": "11:30",
+  "source": "worklog"
+}
 ```
 
-### 2.6. Xem danh sách subtask + giờ
+---
+
+### 2.6. SUB TASK TỰ ĐỘNG
+
+Sub task mới được tạo tự động khi `start` với tham số `-s` mới:
 
 ```bash
-# Tất cả subtask
+# Lần 1 → sinh PRJ-1-KPI-1-ST-1
+python -m tools.timer start -p Backend -t "API Auth" -s "Login endpoint"
+python -m tools.timer stop -d "Xong login"
+
+# Lần 2 → sinh PRJ-1-KPI-1-ST-2 (tự động)
+python -m tools.timer start -p Backend -t "API Auth" -s "Register endpoint"
+python -m tools.timer stop -d "Xong register"
+```
+
+**Quản lý subtask:**
+```bash
+# Danh sách
 python -m tools.timer subtask list
 
 # Lọc theo father task
-python -m tools.timer subtask list -t "Xây dựng API Auth"
+python -m tools.timer subtask list -t "API Auth"
 
-# Xem tất cả entries gom theo task
-python -m tools.timer tasks
-python -m tools.timer tasks -t "Xây dựng API Auth"
-```
-
-### 2.7. Quản lý subtask
-
-```bash
-# Đổi tên subtask (cập nhật toàn bộ Time Entries)
-python -m tools.timer subtask rename -s "Login API" -n "Authentication Module"
+# Đổi tên (cập nhật Time Entries)
+python -m tools.timer subtask rename -s "Login endpoint" -n "Authentication Module"
 
 # Xóa tên subtask
 python -m tools.timer subtask delete -s "Old Module"
 ```
 
-### 2.8. Hoàn thành Father Task
+---
+
+### 2.7. XEM BÁO CÁO
+
+```bash
+# Hôm nay (group theo project)
+python -m tools.timer today
+
+# Tuần này (group theo project)
+python -m tools.timer week
+
+# Tất cả entries gom theo father task (group theo project)
+python -m tools.timer tasks
+
+# Lọc theo father task
+python -m tools.timer tasks -t "API Auth"
+```
+
+---
+
+### 2.8. HOÀN THÀNH KPI
 
 ```bash
 # Khi làm xong hết các subtask
-python -m tools.timer kpi done -t "Xây dựng API Auth"
+python -m tools.timer kpi done -t "API Auth"
+```
 
-# Kiểm tra tiến độ
-python -m tools.timer kpi status
+Dữ liệu cập nhật trong sheet KPIs:
+| Cột | Giá trị |
+|-----|---------|
+| G: Status | `Done` |
+| H: Completed Date | hôm nay |
+
+---
+
+## 3. CÁC LỆNH KHÁC
+
+### Pomodoro
+```bash
+python -m tools.timer pomo                      # 25' work + 5' rest
+python -m tools.timer pomo --work 45 --rest 15  # 45' work + 15' rest
+```
+
+### Hủy timer
+```bash
+python -m tools.timer cancel   # Xóa state, không ghi gì
+```
+
+### Trạng thái timer
+```bash
+python -m tools.timer status   # Đang chạy / đang pause / elapsed
+```
+
+### Validate & Báo cáo
+```bash
+python -m tools.validate       # Kiểm tra dữ liệu
+python -m tools.gamify         # Điểm/streak/level
+python -m tools.report         # Báo cáo tổng hợp
+python -m tools.auto            # Chạy tất cả (validate + gamify + report)
 ```
 
 ---
 
-## 3. Ví dụ luồng thực tế (cả dự án)
+## 4. TÍNH NĂNG MỞ RỘNG
+
+### SQLite Backend
+```powershell
+$env:WORKLOG_DB = "sqlite"
+python -m tools.timer start -p Backend -t "API Auth" -s "Login"
+python -m tools.timer stop -d "Xong"
+# Dữ liệu ghi song song vào ~/.worklog.db
+sqlite3 ~/.worklog.db "SELECT * FROM time_entries;"
+```
+
+### Webhook Notifications
+```powershell
+$env:WORKLOG_WEBHOOK_URL = "https://hooks.slack.com/services/xxx/yyy/zzz"
+python -m tools.timer webhook-test              # Kiểm tra kết nối
+python -m tools.timer stop -d "Xong feature"    # Tự động gửi webhook
+```
+
+---
+
+## 5. CẤU TRÚC EXCEL
+
+| Sheet | Vị trí | Mô tả |
+|-------|--------|-------|
+| Time Entries | 1 | Nhật ký thời gian (ghi tự động) |
+| Projects | 2 | Danh sách dự án (ghi bằng `project add`) |
+| KPIs | 3 | Father task + deadline (ghi bằng `kpi add`) |
+| Weekly Summary | 4 | Tự động tổng hợp tuần |
+| Daily Detail | 5 | Tự động chi tiết ngày |
+| Monthly | 6 | Tự động % hoàn thành KPI |
+
+### Cột Time Entries
+
+| Cột | Tên | Ghi chú |
+|-----|-----|---------|
+| A | Date | `dd-mm-yyyy` |
+| B | Day | Tự động |
+| C | Project | |
+| D | Father Task | |
+| E | Sub Task | |
+| F | Sub Task Code | `PRJ1-KPI-1-ST-1` |
+| G | Category | Development, Testing, Review... |
+| H | Start Time | `hh:mm` |
+| I | End Time | `hh:mm` |
+| J | Duration (h) | Công thức tự động |
+| K | Description | |
+| L | Break Info | `meeting(15m); lunch(30m)` |
+| M→R | Helper | Cột ẩn (công thức) |
+
+---
+
+## 6. VÍ DỤ LUỒNG THỰC TẾ HOÀN CHỈNH
 
 ```bash
-# === NGÀY 1 ===
+# === SÁNG ===
 
-# Tạo project
-python -m tools.timer project add -n Frontend -d "UI development"
-python -m tools.timer project add -n Backend -d "API development"
+# Tạo project (1 lần)
+python -m tools.timer project add -n "Frontend" -d "UI dashboard"
+python -m tools.timer project add -n "Backend" -d "API services"
 
-# Tạo mục tiêu trong project
-python -m tools.timer kpi add -t "Dashboard UI" -p Frontend -d 2
-python -m tools.timer kpi add -t "API Dashboard" -p Backend -d 3
+# Tạo KPI
+python -m tools.timer kpi add -t "Dashboard UI" -p Frontend -d 3
+python -m tools.timer kpi add -t "API Stats" -p Backend -d 2
 
-# Làm subtask 1 của Dashboard UI
-python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Layout chính" -c "UI/UX"
-python -m tools.timer stop -d "Xong grid layout, sidebar, navbar"
-
-# Ăn trưa
-python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Layout chính" -c "UI/UX"
-python -m tools.timer pause -r lunch
+# Làm subtask 1
+python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Layout" -c "UI/UX"
+python -m tools.timer pause -r meeting
+# ... họp 15 phút ...
 python -m tools.timer continue
-python -m tools.timer stop -d "Responsive xong mobile"
+python -m tools.timer stop -d "Xong grid layout"
 
-# Subtask mới
-python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Widget thống kê" -c "UI/UX"
+# === TRƯA ===
+python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Layout" -c "UI/UX"
+python -m tools.timer pause -r lunch
+# ... ăn trưa 45 phút ...
+python -m tools.timer continue
+python -m tools.timer stop -d "Responsive mobile done"
+
+# === CHIỀU ===
+python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Widget charts" -c "UI/UX"
 python -m tools.timer stop -d "Xong biểu đồ doanh thu"
 
-# Kiểm tra cuối ngày
+python -m tools.timer start -p Backend -t "API Stats" -s "GET /stats" -c Development
+python -m tools.timer stop -d "Xong API + caching"
+
+# === KIỂM TRA CUỐI NGÀY ===
 python -m tools.timer today
-python -m tools.auto
-
-# === NGÀY 2 ===
-
-# Làm tiếp subtask cũ
-python -m tools.timer start -p Frontend -t "Dashboard UI" -s "Widget thống kê" -c "UI/UX"
-python -m tools.timer stop -d "Fix responsive chart"
-
-# Xem còn gì chưa xong
 python -m tools.timer kpi status
-
-# Xong KPI
-python -m tools.timer kpi done -t "Dashboard UI"
-
-# Chuyển sang Backend
-python -m tools.timer start -p Backend -t "API Dashboard" -s "GET /stats" -c Development
-python -m tools.timer stop -d "Xong API thống kê + caching"
-
-# Cuối ngày
-python -m tools.timer week
 python -m tools.auto
 ```
-
----
-
-## 4. Các lệnh khác
-
-```bash
-# Pomodoro
-python -m tools.timer pomo --work 25 --rest 5
-
-# Sửa/xóa KPI
-python -m tools.timer kpi edit -t "Dashboard UI" -d 5
-python -m tools.timer kpi rename -t "Cũ" -n "Mới"
-python -m tools.timer kpi delete -t "Dashboard UI"
-
-# Validate dữ liệu
-python -m tools.validate
-python -m tools.gamify
-python -m tools.report
-```
-
----
-
-## 5. Tính năng mở rộng (tùy chọn)
-
-```powershell
-# SQLite backend
-$env:WORKLOG_DB = "sqlite"
-python -m tools.timer start -p Backend -t "API Auth" -s "Login" -c Development
-
-# Webhook Slack/Discord
-$env:WORKLOG_WEBHOOK_URL = "https://hooks.slack.com/services/xxx/yyy/zzz"
-python -m tools.timer webhook-test
-```
-
----
-
-## 6. Cấu trúc Excel
-
-| Sheet | Mô tả |
-|-------|-------|
-| Time Entries | Nhật ký thời gian (cột A-L) |
-| Projects | Danh sách dự án (Code, Name, Status) |
-| KPIs | Father task + deadline + trạng thái |
-| Weekly Summary | Tự động tổng hợp tuần |
-| Daily Detail | Tự động chi tiết ngày |
-| Monthly | Tự động % KPI theo tháng |
