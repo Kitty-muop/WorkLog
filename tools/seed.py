@@ -68,7 +68,27 @@ for i, (d, day, proj, task, sub, subcode, cat, start, end, dur, desc) in enumera
     ws_te.cell(row=r, column=9).value = end
     ws_te.cell(row=r, column=11).value = desc
 
+# ====== Projects example ======
+ws_pr = wb['Projects']
+ws_pr.cell(row=2, column=1).value = 'PRJ-1'
+ws_pr.cell(row=2, column=2).value = 'Backend'
+ws_pr.cell(row=2, column=3).value = 'API development and maintenance'
+ws_pr.cell(row=2, column=4).value = 'Active'
+ws_pr.cell(row=2, column=5).value = EXAMPLE_DATE
+
+# Update KPI codes to project-scoped format
+ws_kpi = wb['KPIs']
+ws_kpi.cell(row=2, column=1).value = 'PRJ-1-KPI-1'
+ws_kpi.cell(row=3, column=1).value = 'PRJ-1-KPI-2'
+
+# Update subtask codes in Time Entries
+ws_te.cell(row=2, column=6).value = 'PRJ-1-KPI-1-ST-1'
+ws_te.cell(row=3, column=6).value = 'PRJ-1-KPI-1-ST-2'
+ws_te.cell(row=4, column=6).value = 'PRJ-1-KPI-1-ST-3'
+ws_te.cell(row=5, column=6).value = 'PRJ-1-KPI-2-ST-1'
+
 wb.save(WB_PATH)
-print("Seed data written. Columns affected: A-D, F-J (E=Sub Task blank, K=Description).")
-print(f"  KPIs: 2 father tasks (KPI-1: API Integration, KPI-2: Code Review)")
+print("Seed data written.")
+print(f"  Projects: 1 (PRJ-1: Backend)")
+print(f"  KPIs: 2 (PRJ-1-KPI-1: API Integration, PRJ-1-KPI-2: Code Review)")
 print(f"  Time Entries: {len(entries)} rows for {EXAMPLE_DATE}")

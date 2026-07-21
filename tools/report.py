@@ -42,11 +42,17 @@ def run(gamify_result=None):
     print(f"  Rating:      {rating}")
 
     title("TASK PERFORMANCE")
+    by_project = {}
     for task, t in g['tasks'].items():
-        pct = t['performance_pct']
-        c = GREEN if pct >= 80 else (YELLOW if pct >= 50 else RED)
-        s = "DONE" if t['status'] == "Done" else f"{c}{t['status']}{END}"
-        print(f"  {task} ({t['project']}): {t['logged_hours']}/{t['deadline_hours']}h = {c}{pct}%{END} - {s}")
+        by_project.setdefault(t['project'], []).append((task, t))
+    for proj in sorted(by_project.keys()):
+        print(f"  [{proj}]")
+        for task, t in sorted(by_project[proj]):
+            pct = t['performance_pct']
+            c = GREEN if pct >= 80 else (YELLOW if pct >= 50 else RED)
+            s = "DONE" if t['status'] == "Done" else f"{c}{t['status']}{END}"
+            code = t.get('code', '')
+            print(f"    {code:<18} {task:<25} {t['logged_hours']:.1f}/{t['deadline_hours']}h = {c}{pct}%{END} - {s}")
 
     total = sum(t['logged_hours'] for t in g['tasks'].values())
     print(f"\n{BOLD}{'='*50}{END}")

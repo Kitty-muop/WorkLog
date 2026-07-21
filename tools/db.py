@@ -32,6 +32,16 @@ def init():
             created_at TEXT DEFAULT (datetime('now'))
         )
     ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'Active',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    ''')
     conn.commit()
     conn.close()
 

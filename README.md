@@ -1,6 +1,6 @@
 # WorkLog
 
-CLI tool + Excel workbook ghi nhật ký công việc cho lập trình viên. Tự động tính giờ, theo dõi KPI, phân tích hiệu suất. Tương thích WPS Office.
+CLI tool + Excel workbook ghi nhật ký công việc cho lập trình viên. Tự động tính giờ, theo dõi Project → KPI → Sub Task, phân tích hiệu suất. Tương thích WPS Office.
 
 ## Quick Start
 
@@ -8,18 +8,23 @@ CLI tool + Excel workbook ghi nhật ký công việc cho lập trình viên. T�
 # Build workbook + seed mẫu
 python -m tools.build && python -m tools.seed
 
-# Bắt đầu làm việc (auto-detect: project=thư mục, task=branch git)
-python -m tools.timer start
-# ... làm việc ...
-python -m tools.timer stop -d "Mô tả công việc"
+# Tạo project
+python -m tools.timer project add -n Backend -d "API services"
 
-# Xem hôm nay
+# Tạo KPI cho project
+python -m tools.timer kpi add -t "API Auth" -p Backend -d 5
+
+# Bắt đầu làm việc (auto: project=thư mục, task=branch git)
+python -m tools.timer start -p Backend -t "API Auth" -s "Login endpoint" -c Development
+# ... làm việc ...
+python -m tools.timer stop -d "Xong login API"
+
+# Xem hôm nay (group theo project)
 python -m tools.timer today
 
 # KPI CRUD
-python -m tools.timer kpi add -t "API" -p Backend -d 5
 python -m tools.timer kpi list
-python -m tools.timer kpi done -t "API"
+python -m tools.timer kpi done -t "API Auth"
 
 # Sub Task CRUD
 python -m tools.timer subtask rename -s "Auth" -n "Authentication"
@@ -30,10 +35,10 @@ python -m tools.timer subtask delete -s "Old Module"
 
 ```
 WorkLog/
-├── worklog.xlsx         # File Excel chính (5 sheet, tự động tính)
+├── worklog.xlsx         # File Excel chính (6 sheet, tự động tính)
 ├── worklog.xlsm         # Bản có macro (VBA timer button)
 ├── tools/               # Python CLI
-│   ├── timer.py         # Timer + CRUD (start/stop/kpi/subtask/today...)
+│   ├── timer.py         # Timer + CRUD (project/kpi/subtask/start/stop...)
 │   ├── build.py         # Xây dựng workbook
 │   ├── seed.py          # Dữ liệu mẫu
 │   ├── validate.py      # Kiểm tra dữ liệu

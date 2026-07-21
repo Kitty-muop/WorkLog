@@ -132,9 +132,34 @@ ws_te.auto_filter.ref = f'A1:L{MAX_DATA_ROWS + 1}'
 print("Sheet 1 done: Time Entries with WPS-compatible helpers")
 
 # ===================================================================
-# SHEET 2: KPIs
+# SHEET 2: Projects
 # ===================================================================
-ws_kp = wb.create_sheet('KPIs', 1)
+ws_pr = wb.create_sheet('Projects', 1)
+
+ws_pr.column_dimensions['A'].width = 10
+ws_pr.column_dimensions['B'].width = 25
+ws_pr.column_dimensions['C'].width = 40
+ws_pr.column_dimensions['D'].width = 14
+ws_pr.column_dimensions['E'].width = 15
+
+headers_pr = ['Code', 'Project Name', 'Description', 'Status', 'Created Date']
+for i, h in enumerate(headers_pr, 1):
+    ws_pr.cell(row=1, column=i, value=h)
+style_header(ws_pr, 1, 5)
+
+ws_pr.cell(row=2, column=2).value = '[Enter project name]'
+ws_pr.cell(row=2, column=2).font = Font(name='Calibri', size=11, italic=True, color='999999')
+
+for r in range(2, MAX_DATA_ROWS + 2):
+    ws_pr.cell(row=r, column=4).number_format = 'dd-mm-yyyy'
+
+ws_pr.freeze_panes = 'A2'
+print("Sheet 2 done: Projects")
+
+# ===================================================================
+# SHEET 3: KPIs
+# ===================================================================
+ws_kp = wb.create_sheet('KPIs', 2)
 
 ws_kp.column_dimensions['A'].width = 10
 ws_kp.column_dimensions['B'].width = 30
@@ -555,7 +580,7 @@ print("Sheet 5 done: Monthly (WPS-compatible)")
 # ===================================================================
 # Reorder sheets
 # ===================================================================
-desired_order = ['Time Entries', 'KPIs', 'Weekly Summary', 'Daily Detail', 'Monthly']
+desired_order = ['Time Entries', 'Projects', 'KPIs', 'Weekly Summary', 'Daily Detail', 'Monthly']
 for i, name in enumerate(desired_order):
     idx = wb.sheetnames.index(name)
     wb.move_sheet(name, offset=i - idx)

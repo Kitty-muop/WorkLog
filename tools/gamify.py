@@ -29,13 +29,26 @@ def load_gamify_data():
 def save_gamify_data(data):
     SCORE_FILE.write_text(json.dumps(data, indent=2, default=str))
 
+def get_dur(val):
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+    if hasattr(val, 'hour'):
+        return 0.0
+    return 0.0
+
+
 def get_time_entries(ws):
     entries = []
     for r in ws.iter_rows(min_row=2, max_row=ws.max_row, values_only=True):
-        date_raw, _, project, task, _, category, _, _, dur, desc = (
-            r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]
-        )
-        if date_raw and dur and dur > 0:
+        date_raw = r[0]
+        project = r[2]
+        task = r[3]
+        category = r[6]
+        dur = get_dur(r[9])
+        desc = r[10] if len(r) > 10 else ''
+        if date_raw and dur > 0:
             entries.append({
                 "date": pd.Timestamp(date_raw).date(),
                 "project": str(project or ""),
@@ -140,12 +153,13 @@ def compute_task_performance(ws, entries):
     ws_kpi = openpyxl.load_workbook(WORKLOG, data_only=True)['KPIs']
     tasks = {}
     for r in ws_kpi.iter_rows(min_row=2, max_row=ws_kpi.max_row, values_only=True):
-        name, project, _, days, hours_deadline, status = r[0], r[1], r[2], r[3], r[4], r[5]
+        code, name, project, _, days, hours_deadline, status = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
         if name:
             deadline_h = hours_deadline if hours_deadline else (days * 7.5 if days else None)
             logged = sum(e["duration"] for e in entries if e["task"] == str(name))
             pct = (logged / deadline_h * 100) if deadline_h and deadline_h > 0 else 0
             tasks[str(name)] = {
+                "code": str(code or ''),
                 "project": str(project),
                 "logged_hours": round(logged, 2),
                 "deadline_hours": deadline_h,

@@ -107,19 +107,22 @@ def find_next_row(ws):
     return ws.max_row + 1
 
 
-def get_next_subtask_code(wb, father_task_code):
-    """Generate next subtask code like KPI-1-ST-1, KPI-1-ST-2..."""
+def get_next_subtask_code(wb, father_task_name):
+    """Generate next subtask code like PRJ1-KPI-1-ST-1 using KPI code from KPIs sheet."""
+    kpi_code = get_kpi_code_from_task(father_task_name)
+    if not kpi_code:
+        return f'{father_task_name}-ST-1'
     ws = wb['Time Entries']
     max_st = 0
     for r2 in range(2, ws.max_row + 1):
         sc = ws.cell(r2, 6).value
-        if sc and str(sc).startswith(f'{father_task_code}-ST-'):
+        if sc and str(sc).startswith(f'{kpi_code}-ST-'):
             try:
                 num = int(str(sc).rsplit('-', 1)[1])
                 max_st = max(max_st, num)
             except:
                 pass
-    return f'{father_task_code}-ST-{max_st + 1}'
+    return f'{kpi_code}-ST-{max_st + 1}'
 
 
 def append_entry(project, task, subtask, subtask_code, category, description,
@@ -397,9 +400,8 @@ def cmd_today(args):
     today = datetime.date.today()
     total = 0.0
     count = 0
-    print(f"Today ({today.strftime('%d-%m-%Y')}):")
-    print(f"{'Project':<15} {'Task':<20} {'Hours':>6} {'Desc':<30}")
-    print("-" * 75)
+
+    entries = []
     for r in range(2, ws.max_row + 1):
         d = ws.cell(r, 1).value
         if d is None:
@@ -411,12 +413,29 @@ def cmd_today(args):
         dur = get_duration(ws, r)
         total += dur
         count += 1
-        proj = ws.cell(r, 3).value or ''
-        task = ws.cell(r, 4).value or ''
-        desc = ws.cell(r, 11).value or ''
-        print(f"{str(proj):<15} {str(task):<20} {dur:>6.2f} {str(desc):<30}")
-    print("-" * 75)
-    print(f"{'TOTAL':<15} {'':<20} {total:>6.2f}")
+        entries.append({
+            'proj': str(ws.cell(r, 3).value or ''),
+            'task': str(ws.cell(r, 4).value or ''),
+            'desc': str(ws.cell(r, 11).value or ''),
+            'dur': dur,
+        })
+
+    print(f"Today ({today.strftime('%d-%m-%Y')}):")
+    by_project = {}
+    for e in entries:
+        by_project.setdefault(e['proj'], []).append(e)
+
+    for proj in sorted(by_project.keys()):
+        print(f"  [{proj}]")
+        print(f"    {'Task':<25} {'Hours':>6} {'Desc':<30}")
+        print(f"    {'-'*63}")
+        for e in by_project[proj]:
+            print(f"    {e['task']:<25} {e['dur']:>6.2f} {e['desc']:<30}")
+        proj_total = sum(e['dur'] for e in by_project[proj])
+        print(f"    {'Project total':<25} {proj_total:>6.2f}")
+        print()
+
+    print(f"{'ALL TOTAL':<15} {total:>6.2f}h")
     if total >= 7.5:
         print("  Full day!")
     else:
@@ -439,7 +458,7 @@ def cmd_week(args):
     print(f"Week: {monday.strftime('%d-%m-%Y')} - {sunday.strftime('%d-%m-%Y')}")
     print()
 
-    entries = {}
+    by_project = {}
     total = 0.0
     for r in range(2, ws.max_row + 1):
         d = ws.cell(r, 1).value
@@ -453,24 +472,30 @@ def cmd_week(args):
         total += dur
         proj = str(ws.cell(r, 3).value or '?')
         task = str(ws.cell(r, 4).value or '?')
-        key = f"{proj}: {task}"
-        entries.setdefault(key, 0)
-        entries[key] += dur
+        by_project.setdefault(proj, {})
+        by_project[proj].setdefault(task, 0)
+        by_project[proj][task] += dur
 
-    print(f"{'Task':<35} {'Hours':>6}")
-    print("-" * 45)
-    for k, v in sorted(entries.items(), key=lambda x: -x[1]):
-        print(f"{k:<35} {v:>6.2f}")
-    print("-" * 45)
-    print(f"{'TOTAL':<35} {total:>6.2f}")
+    for proj in sorted(by_project.keys()):
+        tasks = by_project[proj]
+        proj_total = sum(tasks.values())
+        print(f"  [{proj}] ({proj_total:.2f}h)")
+        for t, h in sorted(tasks.items(), key=lambda x: -x[1]):
+            print(f"    {t:<30} {h:>6.2f}")
+        print()
+
+    print(f"{'WEEK TOTAL':<35} {total:>6.2f}h")
     if total:
-        days_worked = len({ws.cell(r, 1).value
-                          for r in range(2, ws.max_row + 1)
-                          if ws.cell(r, 1).value
-                          and (isinstance(ws.cell(r, 1).value, datetime.datetime) and
-                               monday <= ws.cell(r, 1).value.date() <= sunday) or
-                          (isinstance(ws.cell(r, 1).value, datetime.date) and
-                           monday <= ws.cell(r, 1).value <= sunday)})
+        days_set = set()
+        for r in range(2, ws.max_row + 1):
+            d = ws.cell(r, 1).value
+            if d is None:
+                break
+            if isinstance(d, datetime.datetime):
+                d = d.date()
+            if monday <= d <= sunday:
+                days_set.add(d)
+        days_worked = len(days_set)
         print(f"  Days active: {days_worked}, Avg: {total / max(days_worked, 1):.2f}h/day")
     return 0
 
@@ -501,6 +526,51 @@ def cmd_pomo(args):
 
     print(f"\nCompleted {cycles} pomodoro cycles.")
     return 0
+
+
+# ─── Project helpers ─────────────────────────────────────────────────
+
+def get_projects():
+    """Read Projects sheet, return list of dicts."""
+    if not os.path.exists(WORKLOG_FILE):
+        return []
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Projects']
+    projects = []
+    for r in range(2, ws.max_row + 1):
+        name = ws.cell(r, 2).value
+        if name is None or str(name).strip() in ('', '[Enter project name]'):
+            break
+        projects.append({
+            'row': r,
+            'code': str(ws.cell(r, 1).value or ''),
+            'name': str(name).strip(),
+            'description': str(ws.cell(r, 3).value or ''),
+            'status': str(ws.cell(r, 4).value or 'Active'),
+        })
+    return projects
+
+
+def get_project_code(project_name):
+    """Get project code from Projects sheet by name."""
+    projects = get_projects()
+    for p in projects:
+        if p['name'].lower() == project_name.lower():
+            return p['code']
+    return None
+
+
+def get_kpi_code_from_task(task_name):
+    """Get KPI code (e.g. PRJ1-KPI-1) from KPIs sheet by father task name."""
+    if not os.path.exists(WORKLOG_FILE):
+        return None
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['KPIs']
+    for r in range(2, ws.max_row + 1):
+        name = ws.cell(r, 2).value
+        if name and str(name).strip() == task_name:
+            return str(ws.cell(r, 1).value or '')
+    return None
 
 
 # ─── KPI commands ────────────────────────────────────────────────────
@@ -563,15 +633,31 @@ def cmd_kpi(args):
 def cmd_kpi_list(args):
     kpis = get_kpis()
     if not kpis:
-        print("No KPIs found. Add one with: kpi add -t NAME -p PROJECT -d DAYS")
+        print("No KPIs found. Add a project first with:")
+        print("  python -m tools.timer project add -n \"My Project\"")
+        print("Then add KPIs: kpi add -t NAME -p PROJECT -d DAYS")
         return 0
-    print(f"{'Code':<10} {'Father Task':<25} {'Project':<15} {'Deadline':<10} {'Hours':>8} {'Status':<15}")
-    print("-" * 85)
+
+    # Group by project
+    by_project = {}
     for k in kpis:
-        hours = get_total_hours_for_task(k['name'])
-        dl = k['deadline_days']
-        dl_str = f"{dl}d" if dl else '—'
-        print(f"{k['code']:<10} {k['name']:<25} {k['project']:<15} {dl_str:<10} {hours:>8.2f} {k['status']:<15}")
+        by_project.setdefault(k['project'], []).append(k)
+
+    total_all = 0.0
+    for proj_name in sorted(by_project.keys()):
+        print(f"\n[{proj_name}]")
+        print(f"{'Code':<18} {'Father Task':<25} {'Deadline':<10} {'Hours':>8} {'Status':<15}")
+        print("-" * 78)
+        proj_total = 0.0
+        for k in by_project[proj_name]:
+            hours = get_total_hours_for_task(k['name'])
+            proj_total += hours
+            dl = k['deadline_days']
+            dl_str = f"{dl}d" if dl else '—'
+            print(f"{k['code']:<18} {k['name']:<25} {dl_str:<10} {hours:>8.2f} {k['status']:<15}")
+        print(f"{'Project total':<18} {'':25} {'':10} {proj_total:>8.2f}")
+        total_all += proj_total
+    print(f"\nGrand total: {total_all:.2f}h across {len(kpis)} KPIs")
     return 0
 
 
@@ -579,6 +665,16 @@ def cmd_kpi_add(args):
     if not args.name:
         print("Error: -t NAME is required")
         return 1
+    if not args.project:
+        print("Error: -p PROJECT is required (add project first with 'project add')")
+        return 1
+
+    proj_code = get_project_code(args.project)
+    if not proj_code:
+        print(f"Error: Project '{args.project}' not found. Add it first with:")
+        print(f"  python -m tools.timer project add -n \"{args.project}\"")
+        return 1
+
     wb = load_workbook(WORKLOG_FILE)
     ws = wb['KPIs']
     r = 2
@@ -588,16 +684,17 @@ def cmd_kpi_add(args):
             return 1
         r += 1
 
-    max_num = 0
+    # Count existing KPIs for this project to get next KPI number
+    max_kpi_num = 0
     for r_check in range(2, ws.max_row + 1):
         code_val = ws.cell(r_check, 1).value
-        if code_val and str(code_val).startswith('KPI-'):
+        if code_val and str(code_val).startswith(f'{proj_code}-KPI-'):
             try:
-                num = int(str(code_val).split('-')[1])
-                max_num = max(max_num, num)
+                num = int(str(code_val).rsplit('-', 1)[1])
+                max_kpi_num = max(max_kpi_num, num)
             except:
                 pass
-    new_code = f'KPI-{max_num + 1}'
+    new_code = f'{proj_code}-KPI-{max_kpi_num + 1}'
 
     ws.cell(r, 1).value = new_code
     ws.cell(r, 2).value = args.name
@@ -609,7 +706,7 @@ def cmd_kpi_add(args):
     ws.cell(r, 7).value = 'In Progress'
     ws.cell(r, 8).value = None
     wb.save(WORKLOG_FILE)
-    print(f"KPI added: {args.name} (code={new_code}, project={args.project or '?'}, deadline={args.deadline}d)")
+    print(f"KPI added: {args.name} (code={new_code}, project={args.project}, deadline={args.deadline}d)")
     return 0
 
 
@@ -701,21 +798,34 @@ def cmd_kpi_status(args):
     if not kpis:
         print("No KPIs found.")
         return 0
-    done_count = sum(1 for k in kpis if k['status'] == 'Done')
-    in_progress = sum(1 for k in kpis if k['status'] != 'Done')
-    total_hours = sum(get_total_hours_for_task(k['name']) for k in kpis)
-    print(f"{'Code':<10} {'Task':<25} {'Hours':>8} {'Deadline':<10} {'Status':<12} {'Completed':<15}")
-    print("-" * 82)
+
+    by_project = {}
     for k in kpis:
-        hours = get_total_hours_for_task(k['name'])
-        dl = k['deadline_days']
-        dl_str = f"{dl}d" if dl else '—'
-        comp = ''
-        if k['completed']:
-            comp = k['completed'].strftime('%d-%m-%Y') if hasattr(k['completed'], 'strftime') else str(k['completed'])
-        print(f"{k['code']:<10} {k['name']:<25} {hours:>8.2f} {dl_str:<10} {k['status']:<12} {comp:<15}")
-    print("-" * 82)
-    print(f"Done: {done_count} | In Progress: {in_progress} | Total hours: {total_hours:.2f}")
+        by_project.setdefault(k['project'], []).append(k)
+
+    total_all = 0.0
+    done_all = 0
+    for proj_name in sorted(by_project.keys()):
+        proj_kpis = by_project[proj_name]
+        print(f"\n[{proj_name}]")
+        print(f"{'Code':<18} {'Task':<25} {'Hours':>8} {'Deadline':<10} {'Status':<12} {'Completed':<15}")
+        print("-" * 90)
+        proj_total = 0.0
+        for k in proj_kpis:
+            hours = get_total_hours_for_task(k['name'])
+            proj_total += hours
+            dl = k['deadline_days']
+            dl_str = f"{dl}d" if dl else '—'
+            comp = ''
+            if k['completed']:
+                comp = k['completed'].strftime('%d-%m-%Y') if hasattr(k['completed'], 'strftime') else str(k['completed'])
+            print(f"{k['code']:<18} {k['name']:<25} {hours:>8.2f} {dl_str:<10} {k['status']:<12} {comp:<15}")
+        done_proj = sum(1 for k in proj_kpis if k['status'] == 'Done')
+        print(f"{'Project total':<18} {'':25} {proj_total:>8.2f} {'':10} {'Done:' + str(done_proj) + '/' + str(len(proj_kpis)):<12}")
+        total_all += proj_total
+        done_all += done_proj
+
+    print(f"\nOverall: {done_all}/{len(kpis)} done | Total: {total_all:.2f}h")
     return 0
 
 
@@ -734,12 +844,13 @@ def cmd_tasks(args):
         if ft is None or str(ft).strip() == '':
             break
         ft = str(ft).strip()
+        proj = str(ws.cell(r, 3).value or '')
         st = ws.cell(r, 5).value
         sc = ws.cell(r, 6).value
         cat = ws.cell(r, 7).value or ''
         desc = ws.cell(r, 11).value or ''
         dur = get_duration(ws, r)
-        groups.setdefault(ft, []).append({'sub': str(st or ''), 'sc': str(sc or ''), 'cat': str(cat), 'dur': dur, 'desc': str(desc)})
+        groups.setdefault(ft, []).append({'proj': proj, 'sub': str(st or ''), 'sc': str(sc or ''), 'cat': str(cat), 'dur': dur, 'desc': str(desc)})
 
     if args.task:
         ft = args.task
@@ -748,7 +859,8 @@ def cmd_tasks(args):
             print(f"No entries for father task '{ft}'.")
             return 0
         total = sum(e['dur'] for e in entries)
-        print(f"Father Task: {ft}")
+        proj = entries[0]['proj'] if entries else ''
+        print(f"[{proj}] Father Task: {ft}")
         print(f"{'Sub Task':<20} {'Sub Task Code':<15} {'Category':<15} {'Hours':>8} {'Description':<30}")
         print("-" * 90)
         for e in entries:
@@ -759,14 +871,27 @@ def cmd_tasks(args):
         if not groups:
             print("No time entries found.")
             return 0
-        print(f"{'Father Task':<25} {'Entries':>8} {'Hours':>8} {'Last Date':<15}")
-        print("-" * 58)
+
+        # Group by project
+        by_project = {}
         for ft, entries in groups.items():
-            total = sum(e['dur'] for e in entries)
-            print(f"{ft:<25} {len(entries):>8} {total:>8.2f}")
-        print("-" * 58)
-        total_all = sum(sum(e['dur'] for e in entries) for entries in groups.values())
-        print(f"{'ALL':<25} {'':>8} {total_all:>8.2f}")
+            proj = entries[0]['proj'] if entries else '?'
+            by_project.setdefault(proj, {})[ft] = entries
+
+        total_all = 0.0
+        for proj in sorted(by_project.keys()):
+            tasks = by_project[proj]
+            print(f"\n[{proj}]")
+            print(f"{'Father Task':<25} {'Entries':>8} {'Hours':>8}")
+            print("-" * 43)
+            proj_total = 0.0
+            for ft, entries in sorted(tasks.items()):
+                total = sum(e['dur'] for e in entries)
+                proj_total += total
+                print(f"{ft:<25} {len(entries):>8} {total:>8.2f}")
+            print(f"{'Project total':<25} {'':>8} {proj_total:>8.2f}")
+            total_all += proj_total
+        print(f"\nGrand total: {total_all:.2f}h")
     return 0
 
 
@@ -844,6 +969,123 @@ def cmd_sub_delete(args):
             count += 1
     wb.save(WORKLOG_FILE)
     print(f"Cleared {count} subtask entries matching '{args.subtask}'.")
+    return 0
+
+
+# ─── Project commands ────────────────────────────────────────────────
+
+def cmd_project(args):
+    if not args.proj_cmd:
+        print("Usage: project {list|add|rename|archive}")
+        print()
+        print("  list         List all projects")
+        print("  add          Add a new project")
+        print("  rename       Rename a project (updates Projects + KPIs + Time Entries)")
+        print("  archive      Archive a project")
+        return 1
+    return args.proj_func(args)
+
+
+def get_next_project_code():
+    """Generate next project code PRJ-1, PRJ-2..."""
+    projects = get_projects()
+    max_n = 0
+    for p in projects:
+        code = p['code']
+        if code and code.startswith('PRJ-'):
+            try:
+                n = int(code.split('-')[1])
+                max_n = max(max_n, n)
+            except:
+                pass
+    return f'PRJ-{max_n + 1}'
+
+
+def cmd_project_add(args):
+    if not args.name:
+        print("Error: -n NAME is required")
+        return 1
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Projects']
+    r = 2
+    while ws.cell(r, 2).value and str(ws.cell(r, 2).value).strip() not in ('', '[Enter project name]'):
+        if str(ws.cell(r, 2).value).strip().lower() == args.name.strip().lower():
+            print(f"Project '{args.name}' already exists at row {r}.")
+            return 1
+        r += 1
+
+    code = get_next_project_code()
+    ws.cell(r, 1).value = code
+    ws.cell(r, 2).value = args.name.strip()
+    ws.cell(r, 3).value = args.description or ''
+    ws.cell(r, 4).value = 'Active'
+    ws.cell(r, 5).value = datetime.date.today()
+    ws.cell(r, 5).number_format = 'dd-mm-yyyy'
+    wb.save(WORKLOG_FILE)
+    print(f"Project added: {args.name} (code={code})")
+    return 0
+
+
+def cmd_project_list(args):
+    projects = get_projects()
+    if not projects:
+        print("No projects found. Add one with: project add -n NAME")
+        return 0
+    print(f"{'Code':<10} {'Name':<25} {'Description':<40} {'Status':<12} {'KPIs':>6}")
+    print("-" * 95)
+    kpis = get_kpis()
+    for p in projects:
+        kpi_count = sum(1 for k in kpis if k['project'].lower() == p['name'].lower())
+        desc = p['description'][:38] + '..' if len(p['description']) > 38 else p['description']
+        print(f"{p['code']:<10} {p['name']:<25} {desc:<40} {p['status']:<12} {kpi_count:>6}")
+    return 0
+
+
+def cmd_project_rename(args):
+    projects = get_projects()
+    found = [p for p in projects if p['name'].lower() == args.name.lower()]
+    if not found:
+        print(f"Project '{args.name}' not found.")
+        return 1
+    new_name = args.new_name.strip() if args.new_name else args.name.strip()
+    if new_name.lower() == args.name.lower():
+        print("New name is same as old name.")
+        return 0
+
+    wb = load_workbook(WORKLOG_FILE)
+    ws_pr = wb['Projects']
+    ws_kp = wb['KPIs']
+    ws_te = wb['Time Entries']
+    r = found[0]['row']
+    ws_pr.cell(r, 2).value = new_name
+
+    for r2 in range(2, ws_kp.max_row + 1):
+        pv = ws_kp.cell(r2, 3).value
+        if pv and str(pv).strip().lower() == args.name.lower():
+            ws_kp.cell(r2, 3).value = new_name
+
+    for r2 in range(2, ws_te.max_row + 1):
+        pv = ws_te.cell(r2, 3).value
+        if pv and str(pv).strip().lower() == args.name.lower():
+            ws_te.cell(r2, 3).value = new_name
+
+    wb.save(WORKLOG_FILE)
+    print(f"Renamed project '{args.name}' -> '{new_name}' (updated in Projects, KPIs, Time Entries)")
+    return 0
+
+
+def cmd_project_archive(args):
+    projects = get_projects()
+    found = [p for p in projects if p['name'].lower() == args.name.lower()]
+    if not found:
+        print(f"Project '{args.name}' not found.")
+        return 1
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Projects']
+    r = found[0]['row']
+    ws.cell(r, 4).value = 'Archived'
+    wb.save(WORKLOG_FILE)
+    print(f"Project '{args.name}' archived.")
     return 0
 
 
@@ -936,6 +1178,23 @@ def main():
     p_ks = ksub.add_parser('status', help='Show overall task progress')
     p_ks.set_defaults(kpi_func=cmd_kpi_status)
 
+    # Project subcommands
+    p_proj = sub.add_parser('project', help='Manage projects')
+    projsub = p_proj.add_subparsers(dest='proj_cmd')
+    p_pa = projsub.add_parser('add', help='Add a new project')
+    p_pa.add_argument('-n', '--name', required=True, help='Project name')
+    p_pa.add_argument('-d', '--description', help='Project description')
+    p_pa.set_defaults(proj_func=cmd_project_add)
+    p_pl = projsub.add_parser('list', help='List all projects')
+    p_pl.set_defaults(proj_func=cmd_project_list)
+    p_pr = projsub.add_parser('rename', help='Rename a project')
+    p_pr.add_argument('-n', '--name', required=True, help='Current project name')
+    p_pr.add_argument('--new-name', help='New project name')
+    p_pr.set_defaults(proj_func=cmd_project_rename)
+    p_parch = projsub.add_parser('archive', help='Archive a project')
+    p_parch.add_argument('-n', '--name', required=True, help='Project name to archive')
+    p_parch.set_defaults(proj_func=cmd_project_archive)
+
     # Subtask subcommands
     p_sub = sub.add_parser('subtask', help='Manage subtasks in Time Entries')
     ssub = p_sub.add_subparsers(dest='sub_cmd')
@@ -970,6 +1229,7 @@ def main():
         'week': cmd_week,
         'pomo': cmd_pomo,
         'kpi': cmd_kpi,
+        'project': cmd_project,
         'tasks': cmd_tasks,
         'subtask': cmd_subtask,
         'webhook-test': webhook.send_test,

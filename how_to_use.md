@@ -4,12 +4,13 @@ File `worklog.xlsx` gồm 5 bảng. **Bạn chỉ cần gõ dữ liệu vào Tim
 
 ---
 
-## 5 Bảng Tính
+## 6 Bảng Tính
 
 | Bảng | Việc của bạn |
 |------|-------------|
 | **Time Entries** | ✍️ Ghi mọi phiên làm việc (Date → Description) |
-| **KPIs** | 🎯 Đặt father task + hạn chót + trạng thái (làm 1 lần) |
+| **Projects** | 📁 Đăng ký dự án (làm 1 lần trước khi tạo KPI) |
+| **KPIs** | 🎯 Đặt father task + hạn chót + trạng thái |
 | **Weekly Summary** | 📊 Tự động — giờ theo task/tuần gần nhất |
 | **Daily Detail** | 📋 Tự động — chi tiết theo ngày (sửa ô C1 để đổi ngày) |
 | **Monthly** | 📈 Tự động — % hoàn thành KPI theo tháng |
@@ -39,37 +40,59 @@ File `worklog.xlsx` gồm 5 bảng. **Bạn chỉ cần gõ dữ liệu vào Tim
 
 ## Sử dụng CLI Timer (khuyên dùng)
 
+### Quản lý Project
+
+Project là cấp cao nhất. Phải tạo project trước rồi mới tạo KPI.
+
+```bash
+# Thêm project
+python -m tools.timer project add -n Backend -d "API development"
+
+# Danh sách project
+python -m tools.timer project list
+
+# Đổi tên project (cập nhật KPIs + Time Entries)
+python -m tools.timer project rename -n "Backend" --new-name "Backend Services"
+
+# Archive project
+python -m tools.timer project archive -n "Old Project"
+```
+
+### Quản lý Father Task (KPI)
+
+KPI thuộc về project. Mã KPI có dạng `PRJ1-KPI-1`.
+
+```bash
+kpi add -t "API Auth" -p Backend -d 5   # Project Backend phải tồn tại
+kpi list                                # Danh sách (group theo project)
+kpi status                              # Tiến độ tổng thể (group theo project)
+kpi edit -t "API Auth" -d 3             # Sửa deadline
+kpi rename -t "Cũ" -n "Mới"            # Đổi tên (cập nhật cả Time Entries)
+kpi done -t "API Auth"                  # Đánh dấu hoàn thành
+kpi delete -t "API Auth"                # Xóa
+```
+
+### Timer
+
 ```bash
 # Bắt đầu (auto: project=thư mục git, task=branch git)
-python -m tools.timer start -p Backend -t "API Integration" -c Development
+python -m tools.timer start -p Backend -t "API Auth" -s "Login" -c Development
 
 # Kết thúc + ghi vào worklog.xlsx
 python -m tools.timer stop -d "Hoàn thành chức năng X"
 
-# Xem hôm nay / tuần
+# Xem hôm nay / tuần (group theo project)
 python -m tools.timer today
 python -m tools.timer week
 
 # Tạm dừng / tiếp tục / hủy / trạng thái
-python -m tools.timer pause -r meeting     # Pause + lý do (meeting, lunch, break, review...)
+python -m tools.timer pause -r meeting
 python -m tools.timer continue
 python -m tools.timer cancel
 python -m tools.timer status
 
 # Pomodoro
 python -m tools.timer pomo --work 25 --rest 5
-```
-
-### Quản lý Father Task (CRUD)
-
-```bash
-kpi add -t "Tên" -p Project -d 5      # Thêm mới (tự động gán mã KPI-1...)
-kpi list                                # Danh sách
-kpi status                              # Tiến độ tổng thể
-kpi edit -t "Tên" -d 3                  # Sửa deadline
-kpi rename -t "Cũ" -n "Mới"            # Đổi tên (cập nhật cả Time Entries)
-kpi done -t "Tên"                       # Đánh dấu hoàn thành
-kpi delete -t "Tên"                     # Xóa
 ```
 
 ### Quản lý Sub Task
