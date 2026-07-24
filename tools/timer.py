@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
 Work Log Timer CLI — for WPS Office users
+Supports multiple independent timers running concurrently.
 Usage:
-  python timer.py start                  Start timer
+  python timer.py start                  Start timer (always creates new)
   python timer.py stop [options]         Stop timer, write to worklog.xlsx
   python timer.py pomo [--work 25] [--rest 5]   Pomodoro session
   python timer.py today                  Show today's hours
   python timer.py week                   Show this week's hours
   python timer.py cancel                 Cancel running timer (discard)
-  python timer.py status                 Show timer status
+  python timer.py status                 Show all timers
+  python timer.py pause [-r REASON]      Pause active timer
+  python timer.py continue               Resume paused timer
 """
 
 import argparse
@@ -35,10 +38,28 @@ DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 # ─── State ───────────────────────────────────────────────────────────
 
+TIMER_ID_COUNTER = 0
+
+
+def _next_timer_id():
+    global TIMER_ID_COUNTER
+    TIMER_ID_COUNTER += 1
+    return f't{TIMER_ID_COUNTER}'
+
+
 def load_state():
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text(encoding='utf-8'))
-    return {}
+        data = json.loads(STATE_FILE.read_text(encoding='utf-8'))
+        # Migrate old single-timer format
+        if 'timers' not in data:
+            old = dict(data)
+            if 'segment_start' in old or old.get('accumulated_seconds', 0) > 0:
+                old['id'] = 't0'
+                old['pause_log'] = old.get('pause_log', [])
+                old['pause_reason'] = old.get('pause_reason', '')
+                return {'timers': [old]}
+        return data
+    return {'timers': []}
 
 
 def save_state(data):
@@ -47,17 +68,55 @@ def save_state(data):
 
 def clear_state():
     if STATE_FILE.exists():
-        STATE_FILE.unlink()
+        STATE_FILE.write_text(json.dumps({'timers': []}, indent=2), encoding='utf-8')
 
 
-def get_elapsed(state):
-    """Get total elapsed seconds from state. Works with paused or running state."""
-    acc = state.get('accumulated_seconds', 0)
-    seg = state.get('segment_start')
-    if seg and not state.get('paused', False):
+def get_elapsed(timer):
+    """Get total elapsed seconds from a single timer dict."""
+    acc = timer.get('accumulated_seconds', 0)
+    seg = timer.get('segment_start')
+    if seg and not timer.get('paused', False):
         sd = datetime.datetime.fromisoformat(seg)
         acc += (datetime.datetime.now() - sd).total_seconds()
     return acc
+
+
+def find_timer(state, project=None, task=None, subtask=None, paused=None, timer_id=None):
+    """Find matching timer. Returns most recent match or None."""
+    timers = state.get('timers', [])
+    candidates = list(timers)
+    if timer_id is not None:
+        candidates = [t for t in candidates if t.get('id') == timer_id]
+    if project is not None:
+        candidates = [t for t in candidates if t.get('project') == project]
+    if task is not None:
+        candidates = [t for t in candidates if t.get('task') == task]
+    if subtask is not None:
+        candidates = [t for t in candidates if t.get('subtask') == subtask]
+    if paused is not None:
+        candidates = [t for t in candidates if t.get('paused', False) == paused]
+    return candidates[-1] if candidates else None
+
+
+def find_timers(state, project=None, task=None, paused=None):
+    """Find all matching timers."""
+    timers = state.get('timers', [])
+    candidates = list(timers)
+    if project is not None:
+        candidates = [t for t in candidates if t.get('project') == project]
+    if task is not None:
+        candidates = [t for t in candidates if t.get('task') == task]
+    if paused is not None:
+        candidates = [t for t in candidates if t.get('paused', False) == paused]
+    return candidates
+
+
+def remove_timer(state, timer_id):
+    """Remove a timer by id. Returns the removed timer or None."""
+    for i, t in enumerate(state.get('timers', [])):
+        if t.get('id') == timer_id:
+            return state['timers'].pop(i)
+    return None
 
 
 # ─── Git Auto-detect ─────────────────────────────────────────────────
@@ -164,19 +223,9 @@ def append_entry(project, task, subtask, subtask_code, category, description,
 
 def cmd_start(args):
     state = load_state()
-    if 'segment_start' in state and not state.get('paused', False):
-        sd = datetime.datetime.fromisoformat(state['segment_start'])
-        elapsed = get_elapsed(state)
-        print(f"Timer already running (started {sd.strftime('%H:%M:%S')}, "
-              f"{int(elapsed)//60}m elapsed)")
-        print("  Use 'stop' to save, 'pause' to pause, or 'cancel' to discard")
-        return 1
-    if state.get('paused', False):
-        print("Timer is paused. Use 'continue' to resume or 'cancel' to discard.")
-        return 1
-
     now = datetime.datetime.now()
     info = {
+        'id': _next_timer_id(),
         'accumulated_seconds': 0,
         'segment_start': now.isoformat(),
         'paused': False,
@@ -187,8 +236,11 @@ def cmd_start(args):
         'category': args.category or 'Development',
         'description': args.description or detect_commit_msg(),
     }
-    save_state(info)
-    print(f"Timer started at {now.strftime('%H:%M:%S')}")
+    state.setdefault('timers', []).append(info)
+    save_state(state)
+    running = len(find_timers(state, paused=False))
+    print(f"Timer #{info['id']} started at {now.strftime('%H:%M:%S')}")
+    print(f"  Active timers: {running}")
     if info['project']:
         print(f"  Project: {info['project']}")
     if info['task']:
@@ -202,26 +254,34 @@ def cmd_start(args):
 
 def cmd_stop(args):
     state = load_state()
-    if 'segment_start' not in state and state.get('accumulated_seconds', 0) <= 0:
-        print("No timer running. Use 'start' first.")
+    timers = state.get('timers', [])
+    if not timers:
+        print("No timers running. Use 'start' first.")
         return 1
 
+    # Find matching timer: by flags, or most recent non-paused, or most recent overall
+    timer = find_timer(state, project=args.project, task=args.task, subtask=args.subtask)
+    if not timer:
+        timer = find_timer(state, paused=False)
+    if not timer:
+        timer = timers[-1]
+
     now = datetime.datetime.now()
-    acc = get_elapsed(state)
+    acc = get_elapsed(timer)
     end_dt = now
 
-    seg = state.get('segment_start')
-    if seg and not state.get('paused', False):
+    seg = timer.get('segment_start')
+    if seg and not timer.get('paused', False):
         start_dt = datetime.datetime.fromisoformat(seg)
     else:
         start_dt = now - datetime.timedelta(seconds=acc)
 
     # Close any open pause
-    pause_log = state.get('pause_log', [])
-    if state.get('paused', False):
-        pause_start = datetime.datetime.fromisoformat(state['segment_start'])
+    pause_log = timer.get('pause_log', [])
+    if timer.get('paused', False):
+        pause_start = datetime.datetime.fromisoformat(timer['segment_start'])
         pause_duration = (now - pause_start).total_seconds() / 60
-        reason = state.get('pause_reason', 'break')
+        reason = timer.get('pause_reason', 'break')
         pause_log.append({
             'reason': reason,
             'start': pause_start.isoformat(),
@@ -239,19 +299,20 @@ def cmd_stop(args):
             total_break_min += p['duration_min']
         break_info = '; '.join(parts)
 
-    project = args.project or state.get('project') or detect_project() or input("Project: ")
-    task = args.task or state.get('task') or detect_branch() or input("Father Task: ")
-    subtask = args.subtask or state.get('subtask')
-    subtask_code = args.subtask_code or state.get('subtask_code')
-    category = args.category or state.get('category') or 'Development'
-    description = args.description or state.get('description') or input("Description: ")
+    project = args.project or timer.get('project') or detect_project() or input("Project: ")
+    task = args.task or timer.get('task') or detect_branch() or input("Father Task: ")
+    subtask = args.subtask or timer.get('subtask')
+    subtask_code = args.subtask_code or timer.get('subtask_code')
+    category = args.category or timer.get('category') or 'Development'
+    description = args.description or timer.get('description') or input("Description: ")
 
     if subtask and not subtask_code:
         wb_sc = load_workbook(WORKLOG_FILE)
         subtask_code = get_next_subtask_code(wb_sc, task)
 
     duration = acc / 3600
-    print(f"Stopped at {end_dt.strftime('%H:%M:%S')}")
+    tid = timer.get('id', '?')
+    print(f"Timer #{tid} stopped at {end_dt.strftime('%H:%M:%S')}")
     print(f"  Duration: {duration:.2f}h ({start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')})")
     print(f"  Project:  {project}")
     print(f"  Task:     {task}")
@@ -269,101 +330,123 @@ def cmd_stop(args):
                  description=description, category=category, subtask=subtask,
                  break_info=break_info,
                  start_time=start_dt.strftime('%H:%M'), end_time=end_dt.strftime('%H:%M'))
-    clear_state()
+    remove_timer(state, timer['id'])
+    save_state(state)
+    remaining = len(state.get('timers', []))
+    if remaining:
+        print(f"  {remaining} timer(s) still active")
     return 0
 
 
 def cmd_cancel(args):
     state = load_state()
-    if 'segment_start' not in state and state.get('accumulated_seconds', 0) <= 0:
+    timers = state.get('timers', [])
+    if not timers:
         print("No timer running.")
         return 1
-    acc = get_elapsed(state)
-    print(f"Cancelled timer ({int(acc)//60}m discarded)")
-    clear_state()
+    timer = find_timer(state, paused=False)
+    if not timer:
+        timer = timers[-1]
+    acc = get_elapsed(timer)
+    tid = timer.get('id', '?')
+    print(f"Cancelled timer #{tid} ({int(acc)//60}m discarded)")
+    remove_timer(state, timer['id'])
+    save_state(state)
     return 0
 
 
 def cmd_status(args):
     state = load_state()
-    if 'segment_start' not in state and state.get('accumulated_seconds', 0) <= 0:
-        print("No timer running.")
+    timers = state.get('timers', [])
+    if not timers:
+        print("No timers running.")
         return 0
 
-    acc = get_elapsed(state)
-    mins = int(acc) // 60
-    hours = mins / 60
+    paused_timers = find_timers(state, paused=True)
+    active_timers = find_timers(state, paused=False)
 
-    if state.get('paused', False):
-        reason = state.get('pause_reason', 'break')
-        print(f"Timer PAUSED ({mins}m / {hours:.2f}h accumulated)")
-        print(f"  Reason: {reason}")
-    else:
-        sd = datetime.datetime.fromisoformat(state['segment_start'])
-        print(f"Timer running: {sd.strftime('%H:%M:%S')} ({mins}m / {hours:.2f}h elapsed)")
+    if active_timers:
+        print(f"Active timers ({len(active_timers)}):")
+        for t in active_timers:
+            acc = get_elapsed(t)
+            mins = int(acc) // 60
+            sd = datetime.datetime.fromisoformat(t['segment_start'])
+            desc = t.get('description', '') or ''
+            print(f"  #{t['id']}: {sd.strftime('%H:%M')} ({mins}m) "
+                  f"Proj={t.get('project','?')} Task={t.get('task','?')} {desc}")
 
-    if state.get('project'):
-        print(f"  Project: {state['project']}")
-    if state.get('task'):
-        print(f"  Task:    {state['task']}")
+    if paused_timers:
+        print(f"Paused timers ({len(paused_timers)}):")
+        for t in paused_timers:
+            acc = get_elapsed(t)
+            mins = int(acc) // 60
+            reason = t.get('pause_reason', 'break')
+            print(f"  #{t['id']}: PAUSED ({mins}m) '{reason}' "
+                  f"Proj={t.get('project','?')} Task={t.get('task','?')}")
+
     return 0
 
 
 def cmd_pause(args):
     state = load_state()
-    if 'segment_start' not in state:
-        print("No timer running.")
+    timer = find_timer(state, paused=False)
+    if not timer:
+        print("No active timer to pause.")
         return 1
-    if state.get('paused', False):
-        print("Timer is already paused. Use 'continue' to resume.")
+    if timer.get('paused', False):
+        print(f"Timer #{timer['id']} is already paused. Use 'continue' to resume.")
         return 1
 
     now = datetime.datetime.now()
-    seg = datetime.datetime.fromisoformat(state['segment_start'])
+    seg = datetime.datetime.fromisoformat(timer['segment_start'])
     elapsed = (now - seg).total_seconds()
-    state['accumulated_seconds'] = state.get('accumulated_seconds', 0) + elapsed
-    state['segment_start'] = now.isoformat()
-    state['paused'] = True
+    timer['accumulated_seconds'] = timer.get('accumulated_seconds', 0) + elapsed
+    timer['segment_start'] = now.isoformat()
+    timer['paused'] = True
     reason = args.reason if args.reason else 'break'
-    state['pause_reason'] = reason
+    timer['pause_reason'] = reason
     save_state(state)
 
-    total = int(state['accumulated_seconds']) // 60
-    print(f"Timer paused at {now.strftime('%H:%M:%S')} ({total}m accumulated)")
+    total = int(timer['accumulated_seconds']) // 60
+    print(f"Timer #{timer['id']} paused at {now.strftime('%H:%M:%S')} ({total}m accumulated)")
     print(f"  Reason: {reason}")
     return 0
 
 
 def cmd_continue(args):
     state = load_state()
-    if not state.get('paused', False):
-        print("Timer is not paused.")
+    timer = find_timer(state, paused=True)
+    if not timer:
+        print("No paused timer found.")
+        return 1
+    if not timer.get('paused', False):
+        print(f"Timer #{timer['id']} is not paused.")
         return 1
 
     now = datetime.datetime.now()
-    pause_start = datetime.datetime.fromisoformat(state['segment_start'])
+    pause_start = datetime.datetime.fromisoformat(timer['segment_start'])
     pause_duration = (now - pause_start).total_seconds() / 60
-    reason = state.get('pause_reason', 'break')
+    reason = timer.get('pause_reason', 'break')
 
-    pause_log = state.get('pause_log', [])
+    pause_log = timer.get('pause_log', [])
     pause_log.append({
         'reason': reason,
         'start': pause_start.isoformat(),
         'end': now.isoformat(),
         'duration_min': int(pause_duration)
     })
-    state['pause_log'] = pause_log
-    state['pause_reason'] = ''
+    timer['pause_log'] = pause_log
+    timer['pause_reason'] = ''
 
-    state['segment_start'] = now.isoformat()
-    state['paused'] = False
+    timer['segment_start'] = now.isoformat()
+    timer['paused'] = False
     save_state(state)
 
-    print(f"Timer resumed at {now.strftime('%H:%M:%S')} ({int(pause_duration)}m {reason})")
-    if state.get('project'):
-        print(f"  Project: {state['project']}")
-    if state.get('task'):
-        print(f"  Task:    {state['task']}")
+    print(f"Timer #{timer['id']} resumed at {now.strftime('%H:%M:%S')} ({int(pause_duration)}m {reason})")
+    if timer.get('project'):
+        print(f"  Project: {timer['project']}")
+    if timer.get('task'):
+        print(f"  Task:    {timer['task']}")
     return 0
 
 
