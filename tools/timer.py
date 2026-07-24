@@ -29,6 +29,7 @@ from openpyxl import load_workbook
 sys.path.insert(0, str(Path(__file__).parent))
 import db
 import webhook
+import gsheets
 
 STATE_FILE = Path.home() / '.worklog_timer.json'
 WORKLOG_FILE = 'worklog.xlsx'
@@ -326,6 +327,9 @@ def cmd_stop(args):
             print(f"  Break total: {total_break_min}m ({total_break_min/60:.1f}h) off-task")
 
     append_entry(project, task, subtask, subtask_code, category, description, start_dt, end_dt, break_info)
+    gsheets.sync_time_entry(project, task, subtask, subtask_code, category, description,
+                            start_dt.strftime('%H:%M'), end_dt.strftime('%H:%M'), duration,
+                            break_info or '', start_dt.date())
     webhook.send(project=project, task=task, duration_h=duration,
                  description=description, category=category, subtask=subtask,
                  break_info=break_info,
@@ -790,6 +794,7 @@ def cmd_kpi_add(args):
     ws.cell(r, 8).value = None
     wb.save(WORKLOG_FILE)
     print(f"KPI added: {args.name} (code={new_code}, project={args.project}, deadline={args.deadline}d)")
+    gsheets.sync_kpi_add(new_code, args.name, args.project, args.deadline)
     return 0
 
 
@@ -810,6 +815,8 @@ def cmd_kpi_done(args):
     ws.cell(r, 8).number_format = 'dd-mm-yyyy'
     wb.save(WORKLOG_FILE)
     print(f"KPI '{args.name}' marked as Done.")
+    gsheets.sync_kpi_update(args.name, 'status', 'Done')
+    gsheets.sync_kpi_update(args.name, 'completed_date', datetime.date.today().strftime('%d-%m-%Y'))
     return 0
 
 
@@ -832,6 +839,10 @@ def cmd_kpi_edit(args):
     wb.save(WORKLOG_FILE)
     if changed:
         print(f"KPI '{args.name}' updated: {', '.join(changed)}")
+        if args.project:
+            gsheets.sync_kpi_update(args.name, 'project', args.project)
+        if args.deadline:
+            gsheets.sync_kpi_update(args.name, 'deadline_days', str(args.deadline))
     else:
         print("No changes made. Use -p PROJECT and/or -d DEADLINE.")
     return 0
@@ -858,6 +869,7 @@ def cmd_kpi_rename(args):
             ws_te.cell(r2, 4).value = new_name
     wb.save(WORKLOG_FILE)
     print(f"Renamed '{args.name}' -> '{new_name}' (updated in KPIs + Time Entries)")
+    gsheets.sync_kpi_rename(args.name, new_name)
     return 0
 
 
@@ -873,6 +885,7 @@ def cmd_kpi_delete(args):
     ws.delete_rows(r)
     wb.save(WORKLOG_FILE)
     print(f"KPI '{args.name}' deleted.")
+    gsheets.sync_kpi_delete(args.name)
     return 0
 
 
@@ -1106,6 +1119,7 @@ def cmd_project_add(args):
     ws.cell(r, 5).number_format = 'dd-mm-yyyy'
     wb.save(WORKLOG_FILE)
     print(f"Project added: {args.name} (code={code})")
+    gsheets.sync_project_add(code, args.name, args.description)
     return 0
 
 
@@ -1154,6 +1168,7 @@ def cmd_project_rename(args):
 
     wb.save(WORKLOG_FILE)
     print(f"Renamed project '{args.name}' -> '{new_name}' (updated in Projects, KPIs, Time Entries)")
+    gsheets.sync_project_update(args.name, 'name', new_name)
     return 0
 
 
@@ -1169,6 +1184,7 @@ def cmd_project_archive(args):
     ws.cell(r, 4).value = 'Archived'
     wb.save(WORKLOG_FILE)
     print(f"Project '{args.name}' archived.")
+    gsheets.sync_project_update(args.name, 'status', 'Archived')
     return 0
 
 

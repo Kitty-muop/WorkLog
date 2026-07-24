@@ -45,7 +45,8 @@ WorkLog/
 │   ├── gamify.py        # Điểm/streak/level
 │   ├── report.py        # Báo cáo tổng hợp
 │   ├── db.py            # SQLite backend (tùy chọn: WORKLOG_DB=sqlite)
-│   └── webhook.py       # Webhook notifications (tùy chọn: WORKLOG_WEBHOOK_URL)
+│   ├── gsheets.py        # Google Sheets sync (tùy chọn: WORKLOG_GSHEETS_*)
+│   └── webhook.py        # Webhook notifications (tùy chọn: WORKLOG_WEBHOOK_URL)
 ├── vba/                 # Macro VBA
 └── docs/
 ```
@@ -55,6 +56,7 @@ WorkLog/
 - **Break Tracking**: Ghi lại lý do và thời gian nghỉ khi pause timer (`pause -r meeting`)
 - **SQLite Backend**: Đồng bộ dữ liệu vào SQLite song song với Excel (`WORKLOG_DB=sqlite`)
 - **Webhook Notifications**: Tự động gửi thông báo qua webhook khi stop timer (`WORKLOG_WEBHOOK_URL`)
+- **Google Sheets Sync**: Tự động đồng bộ dữ liệu vào Google Sheets (cần service account)
 
 ## Biến môi trường
 
@@ -62,6 +64,8 @@ WorkLog/
 |------|-------|
 | `WORKLOG_DB` | `"sqlite"` để bật SQLite backend |
 | `WORKLOG_WEBHOOK_URL` | URL webhook (Slack/Discord) để nhận thông báo |
+| `WORKLOG_GSHEETS_ID` | Google Spreadsheet ID |
+| `WORKLOG_GSHEETS_KEY` | Đường dẫn file JSON service account key |
 
 ## Yêu cầu
 

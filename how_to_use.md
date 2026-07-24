@@ -146,6 +146,43 @@ Kiểm tra webhook:
 python -m tools.timer webhook-test
 ```
 
+## Google Sheets Sync (tùy chọn)
+
+Tự động đồng bộ dữ liệu lên Google Sheets khi chạy timer và CRUD commands.
+
+### Chuẩn bị
+
+1. Tạo **service account** trên Google Cloud Console → IAM & Admin → Service Accounts
+2. Tạo key JSON, tải về máy
+3. Tạo Google Sheet, chia sẻ với email service account (quyền Editor)
+4. Lấy Spreadsheet ID từ URL: `https://docs.google.com/spreadsheets/d/{ID}/edit`
+
+### Sheet structure
+
+Tạo 3 sheet trong Google Sheet với tên và header giống Excel:
+- **Projects**: Code, Project Name, Description, Status, Created Date
+- **KPIs**: Code, Father Task, Project, Date, Deadline (days), Deadline (h), Status, Completed Date, Notes
+- **Time Entries**: Date, Day, Project, Father Task, Sub Task, Sub Task Code, Category, Start Time, End Time, Duration (h), Description, Break Info
+
+### Cấu hình
+
+```bash
+$env:WORKLOG_GSHEETS_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+$env:WORKLOG_GSHEETS_KEY = "C:\path\to\service-account-key.json"
+```
+
+Sau đó dùng CLI bình thường — dữ liệu tự động đồng bộ:
+
+```bash
+python -m tools.timer start -p Backend -t "API"
+python -m tools.timer stop -d "Xong"
+# Dữ liệu được ghi vào cả Excel và Google Sheets
+
+python -m tools.timer project add -n "Frontend"
+python -m tools.timer kpi add -t "Setup" -p Frontend
+# CRUD cũng đồng bộ lên Google Sheets
+```
+
 ## Validate & Báo cáo
 
 ```bash
