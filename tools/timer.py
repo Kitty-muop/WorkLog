@@ -870,6 +870,7 @@ def cmd_kpi_rename(args):
     wb.save(WORKLOG_FILE)
     print(f"Renamed '{args.name}' -> '{new_name}' (updated in KPIs + Time Entries)")
     gsheets.sync_kpi_rename(args.name, new_name)
+    gsheets.sync_kpi_rename_propagate(args.name, new_name)
     return 0
 
 
@@ -1048,6 +1049,7 @@ def cmd_sub_rename(args):
             count += 1
     wb.save(WORKLOG_FILE)
     print(f"Renamed {count} subtask entries '{args.subtask}' -> '{args.new_name}'.")
+    gsheets.sync_subtask_rename(args.subtask, args.new_name)
     return 0
 
 
@@ -1065,6 +1067,7 @@ def cmd_sub_delete(args):
             count += 1
     wb.save(WORKLOG_FILE)
     print(f"Cleared {count} subtask entries matching '{args.subtask}'.")
+    gsheets.sync_subtask_delete(args.subtask)
     return 0
 
 
@@ -1169,6 +1172,7 @@ def cmd_project_rename(args):
     wb.save(WORKLOG_FILE)
     print(f"Renamed project '{args.name}' -> '{new_name}' (updated in Projects, KPIs, Time Entries)")
     gsheets.sync_project_update(args.name, 'name', new_name)
+    gsheets.sync_project_rename_propagate(args.name, new_name)
     return 0
 
 

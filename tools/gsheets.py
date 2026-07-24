@@ -133,6 +133,62 @@ def sync_project_add(code, name, description='', status='Active'):
     return True
 
 
+def sync_project_rename_propagate(old_name, new_name):
+    """Update project name references in KPIs (col 3) and Time Entries (col 3)."""
+    if not is_enabled():
+        return False
+    ws_kpi = _ws('KPIs')
+    if ws_kpi:
+        cells = ws_kpi.findall(old_name, in_column=3)
+        for cell in cells:
+            ws_kpi.update_cell(cell.row, 3, new_name)
+    ws_te = _ws('Time Entries')
+    if ws_te:
+        cells = ws_te.findall(old_name, in_column=3)
+        for cell in cells:
+            ws_te.update_cell(cell.row, 3, new_name)
+    return True
+
+
+def sync_kpi_rename_propagate(old_name, new_name):
+    """Update KPI name references in Time Entries (col 4)."""
+    if not is_enabled():
+        return False
+    ws = _ws('Time Entries')
+    if not ws:
+        return False
+    cells = ws.findall(old_name, in_column=4)
+    for cell in cells:
+        ws.update_cell(cell.row, 4, new_name)
+    return True
+
+
+def sync_subtask_rename(old_name, new_name):
+    """Rename subtask name in all Time Entries rows (col 5)."""
+    if not is_enabled():
+        return False
+    ws = _ws('Time Entries')
+    if not ws:
+        return False
+    cells = ws.findall(old_name, in_column=5)
+    for cell in cells:
+        ws.update_cell(cell.row, 5, new_name)
+    return True
+
+
+def sync_subtask_delete(name):
+    """Clear subtask name in all Time Entries rows (col 5)."""
+    if not is_enabled():
+        return False
+    ws = _ws('Time Entries')
+    if not ws:
+        return False
+    cells = ws.findall(name, in_column=5)
+    for cell in cells:
+        ws.update_cell(cell.row, 5, '')
+    return True
+
+
 def sync_project_update(name, field, value):
     if not is_enabled():
         return False
