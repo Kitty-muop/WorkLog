@@ -224,33 +224,85 @@ python -m tools.timer stop -d "Xong login API, đã test JWT"
 
 ---
 
-### 2.6. SUB TASK TỰ ĐỘNG
+### 2.6. SUB TASK — CHI TIẾT
 
-Sub task mới được tạo tự động khi `start` với tham số `-s` mới:
+#### 2.6.1. Sub Task Code — Cấu trúc & Tự động sinh
+
+Mỗi subtask có code theo format: **`{KPI_CODE}-ST-{SỐ_THỨ_TỰ}`**
+
+Ví dụ với KPI `PRJ-1-KPI-1` (tên "API Auth"):
+```
+PRJ-1-KPI-1-ST-1  ← Login endpoint
+PRJ-1-KPI-1-ST-2  ← Register endpoint
+PRJ-1-KPI-1-ST-3  ← JWT middleware
+```
+
+**Cách auto-generation hoạt động:**
+1. Khi `stop`, nếu có `-s SUBTASK` nhưng không có `--subtask-code`, hệ thống tự động sinh code
+2. Tra KPI code từ tên father task trong sheet KPIs
+3. Tìm số ST lớn nhất hiện có trong Time Entries
+4. Tạo code mới: `{KPI_CODE}-ST-{max + 1}`
 
 ```bash
-# Lần 1 → sinh PRJ-1-KPI-1-ST-1
+# Lần 1 → tự sinh PRJ-1-KPI-1-ST-1
 python -m tools.timer start -p Backend -t "API Auth" -s "Login endpoint"
 python -m tools.timer stop -d "Xong login"
 
-# Lần 2 → sinh PRJ-1-KPI-1-ST-2 (tự động)
+# Lần 2 → tự sinh PRJ-1-KPI-1-ST-2
 python -m tools.timer start -p Backend -t "API Auth" -s "Register endpoint"
 python -m tools.timer stop -d "Xong register"
 ```
 
-**Quản lý subtask:**
+Có thể ghi đè subtask code bằng flag `--subtask-code`:
 ```bash
-# Danh sách
-python -m tools.timer subtask list
+python -m tools.timer start -p Backend -t "API Auth" -s "Custom" --subtask-code "MY-CODE-1"
+```
 
-# Lọc theo father task
+#### 2.6.2. Sub Task trong báo cáo
+
+Subtask hiển thị trong các lệnh xem báo cáo:
+
+```bash
+# Xem tất cả entries → subtask hiện ở cột Sub Task
+python -m tools.timer tasks
+python -m tools.timer tasks -t "API Auth"
+
+# Xem hôm nay → subtask hiện trong chi tiết
+python -m tools.timer today
+```
+
+#### 2.6.3. Quản lý Sub Task
+
+Subtask có thể quản lý độc lập (giống KPI) trên sheet **SubTasks**:
+
+```bash
+# Thêm subtask mới (lên SubTasks sheet)
+python -m tools.timer subtask add -s "Login endpoint" -t "API Auth" -p Backend
+
+# Danh sách subtask từ Time Entries + tổng giờ
+python -m tools.timer subtask list
 python -m tools.timer subtask list -t "API Auth"
 
-# Đổi tên (cập nhật Time Entries)
+# Sửa subtask (project, father task, name, notes)
+python -m tools.timer subtask edit -s "Login endpoint" -p Frontend
+python -m tools.timer subtask edit -s "Login endpoint" -n "Authentication Module"
+
+# Đổi tên subtask (cập nhật SubTasks + Time Entries + Google Sheets)
 python -m tools.timer subtask rename -s "Login endpoint" -n "Authentication Module"
 
-# Xóa tên subtask
+# Xóa subtask khỏi SubTasks sheet
 python -m tools.timer subtask delete -s "Old Module"
+
+# Đánh dấu hoàn thành
+python -m tools.timer subtask done -s "Login endpoint"
+
+# Bắt đầu timer cho subtask đã được tạo
+python -m tools.timer subtask start -s "Login endpoint"
+# Hoặc dùng flag start thông thường (chỉ cho phép subtask đã được tạo sẵn):
+python -m tools.timer start -s "Login endpoint"
+
+# Xem tiến độ subtask (group theo father task)
+python -m tools.timer subtask status
 ```
 
 ---
@@ -343,9 +395,10 @@ python -m tools.timer stop -d "Xong feature"    # Tự động gửi webhook
 | Time Entries | 1 | Nhật ký thời gian (ghi tự động) |
 | Projects | 2 | Danh sách dự án (ghi bằng `project add`) |
 | KPIs | 3 | Father task + deadline (ghi bằng `kpi add`) |
-| Weekly Summary | 4 | Tự động tổng hợp tuần |
-| Daily Detail | 5 | Tự động chi tiết ngày |
-| Monthly | 6 | Tự động % hoàn thành KPI |
+| SubTasks | 4 | Sub task entities (ghi bằng `subtask add`) |
+| Weekly Summary | 5 | Tự động tổng hợp tuần |
+| Daily Detail | 6 | Tự động chi tiết ngày |
+| Monthly | 7 | Tự động % hoàn thành KPI |
 
 ### Cột Time Entries
 

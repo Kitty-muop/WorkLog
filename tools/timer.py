@@ -223,6 +223,27 @@ def append_entry(project, task, subtask, subtask_code, category, description,
 # ─── Commands ────────────────────────────────────────────────────────
 
 def cmd_start(args):
+    subtask_name = getattr(args, 'subtask', None)
+    subtask_code = getattr(args, 'subtask_code', None)
+    if subtask_name:
+        subtasks = get_subtasks()
+        match = None
+        s_clean = subtask_name.strip().lower()
+        for s in subtasks:
+            if s['name'].strip().lower() == s_clean or s['code'].strip().lower() == s_clean:
+                match = s
+                break
+        if not match:
+            print(f"Error: Subtask '{subtask_name}' does not exist in SubTasks sheet.")
+            print("Create it first using 'python -m tools.timer subtask add -s \"<name>\" -t \"<task>\"'")
+            return 1
+        subtask_name = match['name']
+        subtask_code = match['code']
+        if not getattr(args, 'task', None) and match.get('father_task'):
+            args.task = match['father_task']
+        if not getattr(args, 'project', None) and match.get('project'):
+            args.project = match['project']
+
     state = load_state()
     now = datetime.datetime.now()
     info = {
@@ -232,8 +253,8 @@ def cmd_start(args):
         'paused': False,
         'project': args.project or detect_project(),
         'task': args.task or detect_branch(),
-        'subtask': args.subtask,
-        'subtask_code': args.subtask_code,
+        'subtask': subtask_name,
+        'subtask_code': subtask_code,
         'category': args.category or 'Development',
         'description': args.description or detect_commit_msg(),
     }
@@ -243,11 +264,13 @@ def cmd_start(args):
     print(f"Timer #{info['id']} started at {now.strftime('%H:%M:%S')}")
     print(f"  Active timers: {running}")
     if info['project']:
-        print(f"  Project: {info['project']}")
+        print(f"  Project:  {info['project']}")
     if info['task']:
-        print(f"  Task:    {info['task']}")
+        print(f"  Task:     {info['task']}")
+    if info['subtask']:
+        print(f"  Subtask:  {info['subtask']} ({info['subtask_code']})")
     if info['description']:
-        print(f"  Desc:    {info['description']}")
+        print(f"  Desc:     {info['description']}")
     if not info['project'] or not info['task']:
         print("  (Use -p PROJECT -t TASK to override auto-detect)")
     return 0
@@ -992,16 +1015,72 @@ def cmd_tasks(args):
     return 0
 
 
+# ─── Subtask helpers ─────────────────────────────────────────────────
+
+def get_subtasks():
+    """Read SubTasks sheet, return list of dicts."""
+    if not os.path.exists(WORKLOG_FILE):
+        return []
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['SubTasks']
+    subtasks = []
+    for r in range(2, ws.max_row + 1):
+        name = ws.cell(r, 2).value
+        if name is None or name == '' or name == '[Enter subtask name]':
+            break
+        subtasks.append({
+            'row': r,
+            'code': str(ws.cell(r, 1).value or ''),
+            'name': str(name),
+            'father_task': str(ws.cell(r, 3).value or ''),
+            'project': str(ws.cell(r, 4).value or ''),
+            'status': str(ws.cell(r, 5).value or ''),
+            'created_date': ws.cell(r, 6).value,
+            'completed_date': ws.cell(r, 7).value,
+            'notes': str(ws.cell(r, 8).value or ''),
+        })
+    return subtasks
+
+
+def get_next_subtask_code_from_sheet(father_task_name, project):
+    """Get next subtask code like PRJ-1-KPI-1-ST-1 from SubTasks sheet."""
+    kpi_code = get_kpi_code_from_task(father_task_name)
+    if not kpi_code:
+        return None
+    max_n = 0
+    subtasks = get_subtasks()
+    for s in subtasks:
+        if s['code'].startswith(f'{kpi_code}-ST-'):
+            try:
+                n = int(s['code'].rsplit('-', 1)[1])
+                max_n = max(max_n, n)
+            except:
+                pass
+    return f'{kpi_code}-ST-{max_n + 1}'
+
+
 # ─── Subtask ─────────────────────────────────────────────────────────
 
 def cmd_subtask(args):
     if not args.sub_cmd:
-        print("subtask: list | rename | delete")
-        print("  list              Show all subtask names")
-        print("  rename -s OLD -n NEW  Rename subtask in all entries")
-        print("  delete -s NAME    Clear subtask from matching entries")
-        return
+        print("subtask: add | list | edit | rename | delete | done | status | start")
+        print()
+        print("  add        Add a new subtask to SubTasks sheet")
+        print("  list       List all subtasks")
+        print("  edit       Edit subtask project/father task")
+        print("  rename     Rename subtask (updates SubTasks + Time Entries)")
+        print("  delete     Delete subtask from SubTasks sheet")
+        print("  done       Mark a subtask as completed")
+        print("  status     Show subtask progress")
+        print("  start      Start timer for an existing subtask")
+        return 1
     return args.sub_func(args)
+
+
+def cmd_sub_start(args):
+    if not getattr(args, 'subtask_code', None):
+        args.subtask_code = None
+    return cmd_start(args)
 
 
 def cmd_sub_list(args):
@@ -1068,6 +1147,144 @@ def cmd_sub_delete(args):
     wb.save(WORKLOG_FILE)
     print(f"Cleared {count} subtask entries matching '{args.subtask}'.")
     gsheets.sync_subtask_delete(args.subtask)
+    return 0
+
+
+def cmd_sub_add(args):
+    if not args.subtask:
+        print("Error: -s NAME is required")
+        return 1
+    if not args.task:
+        print("Error: -t FATHER_TASK is required")
+        return 1
+
+    # Check if already exists
+    subtasks = get_subtasks()
+    for s in subtasks:
+        if s['name'].lower() == args.subtask.strip().lower():
+            print(f"Subtask '{args.subtask}' already exists (row {s['row']}).")
+            return 1
+
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['SubTasks']
+    r = 2
+    while ws.cell(r, 2).value and str(ws.cell(r, 2).value).strip() not in ('', '[Enter subtask name]'):
+        r += 1
+
+    # Detect project from args or father task lookup
+    project = args.project
+    if not project:
+        kpis = get_kpis()
+        for k in kpis:
+            if k['name'] == args.task:
+                project = k['project']
+                break
+    if not project:
+        print(f"Error: Could not determine project for father task '{args.task}'. Use -p PROJECT.")
+        return 1
+
+    code = get_next_subtask_code_from_sheet(args.task, project)
+    if not code:
+        print(f"Error: Could not generate subtask code. Is father task '{args.task}' valid?")
+        return 1
+
+    ws.cell(r, 1).value = code
+    ws.cell(r, 2).value = args.subtask.strip()
+    ws.cell(r, 3).value = args.task
+    ws.cell(r, 4).value = project
+    ws.cell(r, 5).value = 'In Progress'
+    ws.cell(r, 6).value = datetime.date.today()
+    ws.cell(r, 6).number_format = 'dd-mm-yyyy'
+    ws.cell(r, 7).value = None
+    ws.cell(r, 8).value = args.notes or ''
+    wb.save(WORKLOG_FILE)
+    print(f"Subtask added: {args.subtask} (code={code}, father={args.task}, project={project})")
+    gsheets.sync_subtask_add(code, args.subtask, args.task, project)
+    return 0
+
+
+def cmd_sub_edit(args):
+    subtasks = get_subtasks()
+    found = [s for s in subtasks if s['name'] == args.subtask]
+    if not found:
+        print(f"Subtask '{args.subtask}' not found.")
+        return 1
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['SubTasks']
+    r = found[0]['row']
+    changed = []
+    if args.new_name is not None:
+        ws.cell(r, 2).value = args.new_name
+        changed.append(f"name={args.new_name}")
+    if args.task is not None:
+        ws.cell(r, 3).value = args.task
+        changed.append(f"father_task={args.task}")
+    if args.project is not None:
+        ws.cell(r, 4).value = args.project
+        changed.append(f"project={args.project}")
+    if args.notes is not None:
+        ws.cell(r, 8).value = args.notes
+        changed.append("notes updated")
+    wb.save(WORKLOG_FILE)
+    if changed:
+        print(f"Subtask '{args.subtask}' updated: {', '.join(changed)}")
+        if args.task:
+            gsheets.sync_subtask_update(args.subtask, 'father_task', args.task)
+        if args.project:
+            gsheets.sync_subtask_update(args.subtask, 'project', args.project)
+    else:
+        print("No changes made. Use -t FATHER_TASK, -p PROJECT, -n NEW_NAME, or --notes.")
+    return 0
+
+
+def cmd_sub_done(args):
+    subtasks = get_subtasks()
+    found = [s for s in subtasks if s['name'] == args.subtask]
+    if not found:
+        print(f"Subtask '{args.subtask}' not found.")
+        return 1
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['SubTasks']
+    r = found[0]['row']
+    ws.cell(r, 5).value = 'Done'
+    ws.cell(r, 7).value = datetime.date.today()
+    ws.cell(r, 7).number_format = 'dd-mm-yyyy'
+    wb.save(WORKLOG_FILE)
+    print(f"Subtask '{args.subtask}' marked as Done.")
+    gsheets.sync_subtask_update(args.subtask, 'status', 'Done')
+    gsheets.sync_subtask_update(args.subtask, 'completed_date', datetime.date.today().strftime('%d-%m-%Y'))
+    return 0
+
+
+def cmd_sub_status(args):
+    subtasks = get_subtasks()
+    if not subtasks:
+        print("No subtasks found. Add one with: subtask add -s NAME -t FATHER_TASK")
+        return 0
+
+    by_father = {}
+    for s in subtasks:
+        key = f"{s['project']} / {s['father_task']}"
+        by_father.setdefault(key, []).append(s)
+
+    total_all = 0
+    done_all = 0
+    for key in sorted(by_father.keys()):
+        items = by_father[key]
+        print(f"\n[{key}]")
+        print(f"{'Code':<20} {'Subtask':<25} {'Status':<12} {'Completed':<15}")
+        print("-" * 74)
+        for s in items:
+            comp = ''
+            if s['completed_date']:
+                comp = s['completed_date'].strftime('%d-%m-%Y') if hasattr(s['completed_date'], 'strftime') else str(s['completed_date'])
+            print(f"{s['code']:<20} {s['name']:<25} {s['status']:<12} {comp:<15}")
+        done_sub = sum(1 for s in items if s['status'] == 'Done')
+        print(f"{'Done: ' + str(done_sub) + '/' + str(len(items)):<20}")
+        total_all += len(items)
+        done_all += done_sub
+
+    print(f"\nOverall: {done_all}/{total_all} subtasks done")
     return 0
 
 
@@ -1299,11 +1516,24 @@ def main():
     p_parch.set_defaults(proj_func=cmd_project_archive)
 
     # Subtask subcommands
-    p_sub = sub.add_parser('subtask', help='Manage subtasks in Time Entries')
+    p_sub = sub.add_parser('subtask', help='Manage subtasks')
     ssub = p_sub.add_subparsers(dest='sub_cmd')
-    p_sl = ssub.add_parser('list', help='List all subtasks')
+    p_sa = ssub.add_parser('add', help='Add a new subtask to SubTasks sheet')
+    p_sa.add_argument('-s', '--subtask', required=True, help='Subtask name')
+    p_sa.add_argument('-t', '--task', required=True, help='Father task name')
+    p_sa.add_argument('-p', '--project', help='Project name')
+    p_sa.add_argument('--notes', help='Notes')
+    p_sa.set_defaults(sub_func=cmd_sub_add)
+    p_sl = ssub.add_parser('list', help='List all subtask names from Time Entries')
     p_sl.add_argument('-t', '--task', help='Filter by father task')
     p_sl.set_defaults(sub_func=cmd_sub_list)
+    p_se = ssub.add_parser('edit', help='Edit subtask in SubTasks sheet')
+    p_se.add_argument('-s', '--subtask', required=True, help='Current subtask name')
+    p_se.add_argument('-n', '--new-name', help='New subtask name')
+    p_se.add_argument('-t', '--task', help='New father task')
+    p_se.add_argument('-p', '--project', help='New project')
+    p_se.add_argument('--notes', help='New notes')
+    p_se.set_defaults(sub_func=cmd_sub_edit)
     p_sr = ssub.add_parser('rename', help='Rename subtask in all entries')
     p_sr.add_argument('-s', '--subtask', required=True, help='Current subtask name')
     p_sr.add_argument('-n', '--new-name', required=True, help='New subtask name')
@@ -1311,6 +1541,18 @@ def main():
     p_sdel = ssub.add_parser('delete', help='Clear subtask from all matching entries')
     p_sdel.add_argument('-s', '--subtask', required=True, help='Subtask name to clear')
     p_sdel.set_defaults(sub_func=cmd_sub_delete)
+    p_sdone = ssub.add_parser('done', help='Mark a subtask as completed')
+    p_sdone.add_argument('-s', '--subtask', required=True, help='Subtask name')
+    p_sdone.set_defaults(sub_func=cmd_sub_done)
+    p_sst = ssub.add_parser('status', help='Show subtask progress')
+    p_sst.set_defaults(sub_func=cmd_sub_status)
+    p_sstart = ssub.add_parser('start', help='Start timer for an existing subtask')
+    p_sstart.add_argument('-s', '--subtask', required=True, help='Subtask name or code')
+    p_sstart.add_argument('-p', '--project', help='Project name override')
+    p_sstart.add_argument('-t', '--task', help='Father task override')
+    p_sstart.add_argument('-c', '--category', help='Category override')
+    p_sstart.add_argument('-d', '--description', help='Description override')
+    p_sstart.set_defaults(sub_func=cmd_sub_start)
 
     p_tasks = sub.add_parser('tasks', help='Show tasks grouped by father task')
     p_tasks.add_argument('-t', '--task', help='Filter by father task name')
