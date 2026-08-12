@@ -45,6 +45,27 @@ def is_enabled():
     return bool(os.environ.get(SHEET_ID_VAR) and os.environ.get(KEY_PATH_VAR))
 
 
+def sync_timer_start(project, task, subtask, subtask_code, category, description):
+    """Log timer start to Google Sheets with zero duration"""
+    if not is_enabled():
+        return False
+    from datetime import datetime, date
+    ws = _ws('Time Entries')
+    if not ws:
+        return False
+    now = datetime.now()
+    d = date.today()
+    start_time = now.strftime('%H:%M')
+    # End time same as start for zero duration entry
+    end_time = start_time
+    duration_h = 0.0
+    row = [d.strftime('%d-%m-%Y'), d.strftime('%a'), project, task,
+           subtask or '', subtask_code or '', category,
+           start_time, end_time, f'{duration_h:.2f}', description or '', '']
+    ws.append_row(row, value_input_option='USER_ENTERED')
+    return True
+
+
 def sync_time_entry(project, task, subtask, subtask_code, category, description,
                     start_time, end_time, duration_h, break_info='', date_val=None):
     if not is_enabled():
@@ -186,6 +207,37 @@ def sync_subtask_delete(name):
     cells = ws.findall(name, in_column=5)
     for cell in cells:
         ws.update_cell(cell.row, 5, '')
+    return True
+
+
+def sync_subtask_add(code, name, father_task, project, status='In Progress'):
+    if not is_enabled():
+        return False
+    ws = _ws('SubTasks')
+    if not ws:
+        return False
+    from datetime import date
+    today = date.today()
+    row = [code, name, father_task, project, status,
+           today.strftime('%d-%m-%Y'), '', '']
+    ws.append_row(row, value_input_option='USER_ENTERED')
+    return True
+
+
+def sync_subtask_update(name, field, value):
+    if not is_enabled():
+        return False
+    ws = _ws('SubTasks')
+    if not ws:
+        return False
+    col_map = {'status': 5, 'father_task': 3, 'project': 4, 'completed_date': 7}
+    col = col_map.get(field)
+    if not col:
+        return False
+    cell = ws.find(name, in_column=2)
+    if not cell:
+        return False
+    ws.update_cell(cell.row, col, value)
     return True
 
 

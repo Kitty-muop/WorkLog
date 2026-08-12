@@ -42,9 +42,17 @@ DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 TIMER_ID_COUNTER = 0
 
 
-def _next_timer_id():
+def _next_timer_id(state=None):
     global TIMER_ID_COUNTER
-    TIMER_ID_COUNTER += 1
+    max_id = 0
+    if state and 'timers' in state:
+        for t in state['timers']:
+            try:
+                num = int(str(t.get('id', '')).lstrip('t#'))
+                max_id = max(max_id, num)
+            except Exception:
+                pass
+    TIMER_ID_COUNTER = max(TIMER_ID_COUNTER, max_id) + 1
     return f't{TIMER_ID_COUNTER}'
 
 
@@ -82,21 +90,34 @@ def get_elapsed(timer):
     return acc
 
 
-def find_timer(state, project=None, task=None, subtask=None, paused=None, timer_id=None):
-    """Find matching timer. Returns most recent match or None."""
+def find_timer(state, project=None, task=None, subtask=None, paused=None, timer_id=None, user_id=None):
+    """Find matching timer strictly by user_id. Returns most recent match or None."""
     timers = state.get('timers', [])
     candidates = list(timers)
+    if user_id is not None:
+        candidates = [t for t in candidates if str(t.get('user_id', '')) == str(user_id)]
+        if not candidates:
+            return None
+
     if timer_id is not None:
-        candidates = [t for t in candidates if t.get('id') == timer_id]
+        tid_clean = str(timer_id).strip().lstrip('#').lower()
+        candidates = [t for t in candidates if str(t.get('id', '')).strip().lstrip('#').lower() == tid_clean]
     if project is not None:
-        candidates = [t for t in candidates if t.get('project') == project]
+        p_clean = str(project).strip().lower()
+        candidates = [t for t in candidates if str(t.get('project', '')).strip().lower() == p_clean]
     if task is not None:
-        candidates = [t for t in candidates if t.get('task') == task]
+        t_clean = str(task).strip().lower()
+        candidates = [t for t in candidates if str(t.get('task', '')).strip().lower() == t_clean]
     if subtask is not None:
-        candidates = [t for t in candidates if t.get('subtask') == subtask]
+        s_clean = str(subtask).strip().lower()
+        candidates = [
+            t for t in candidates
+            if str(t.get('subtask', '')).strip().lower() == s_clean or str(t.get('subtask_code', '')).strip().lower() == s_clean
+        ]
     if paused is not None:
         candidates = [t for t in candidates if t.get('paused', False) == paused]
     return candidates[-1] if candidates else None
+
 
 
 def find_timers(state, project=None, task=None, paused=None):
@@ -112,11 +133,18 @@ def find_timers(state, project=None, task=None, paused=None):
     return candidates
 
 
-def remove_timer(state, timer_id):
-    """Remove a timer by id. Returns the removed timer or None."""
-    for i, t in enumerate(state.get('timers', [])):
-        if t.get('id') == timer_id:
-            return state['timers'].pop(i)
+def remove_timer(state, timer_or_id):
+    """Remove a timer by dict matching, object reference, or id. Returns the removed timer or None."""
+    timers = state.get('timers', [])
+    if isinstance(timer_or_id, dict):
+        start_t = timer_or_id.get('segment_start')
+        st_name = timer_or_id.get('subtask')
+        for i, t in enumerate(timers):
+            if t is timer_or_id or (start_t and t.get('segment_start') == start_t) or (st_name and t.get('subtask') == st_name):
+                return timers.pop(i)
+    for i, t in enumerate(timers):
+        if str(t.get('id', '')) == str(timer_or_id):
+            return timers.pop(i)
     return None
 
 
@@ -153,10 +181,196 @@ def detect_commit_msg():
         return None
 
 
-# ─── XLSX helpers ────────────────────────────────────────────────────
+def get_hours_for_subtask(subtask_name):
+    """Total hours logged in Time Entries for a subtask."""
+    if not subtask_name or not os.path.exists(WORKLOG_FILE):
+        return 0.0
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Time Entries']
+    total = 0.0
+    s_clean = subtask_name.strip().lower()
+    for r in range(2, ws.max_row + 1):
+        st = ws.cell(r, 5).value
+        if st and str(st).strip().lower() == s_clean:
+            total += get_duration(ws, r)
+    return total
 
-def get_day_name(d):
-    return DAY_NAMES[d.weekday()]
+
+def get_hours_for_kpi(kpi_name):
+    """Total hours logged in Time Entries for a KPI / Father Task."""
+    if not kpi_name or not os.path.exists(WORKLOG_FILE):
+        return 0.0
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Time Entries']
+    total = 0.0
+    k_clean = kpi_name.strip().lower()
+    for r in range(2, ws.max_row + 1):
+        ft = ws.cell(r, 4).value
+        if ft and str(ft).strip().lower() == k_clean:
+            total += get_duration(ws, r)
+    return total
+
+
+def get_hours_for_project(project_name):
+    """Total hours logged in Time Entries for a Project."""
+    if not project_name or not os.path.exists(WORKLOG_FILE):
+        return 0.0
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Time Entries']
+    total = 0.0
+    p_clean = project_name.strip().lower()
+    for r in range(2, ws.max_row + 1):
+        p = ws.cell(r, 3).value
+        if p and str(p).strip().lower() == p_clean:
+            total += get_duration(ws, r)
+    return total
+
+
+def get_hierarchy_watched_time(project, task, subtask, current_elapsed_sec=0):
+    """Calculate watched time across all 3 levels: Subtask < KPI < Project."""
+    cur_h = current_elapsed_sec / 3600.0
+    sub_h = get_hours_for_subtask(subtask) + cur_h if subtask else 0.0
+    kpi_h = get_hours_for_kpi(task) + cur_h if task else 0.0
+    proj_h = get_hours_for_project(project) + cur_h if project else 0.0
+    return {
+        'subtask': (subtask, sub_h),
+        'kpi': (task, kpi_h),
+        'project': (project, proj_h),
+    }
+
+
+def cmd_performance(args=None):
+    """Generate Friday Weekly Performance Report summarizing Subtask < KPI < Project time watching & progress."""
+    if not os.path.exists(WORKLOG_FILE):
+        print("No worklog.xlsx found.")
+        return 1
+
+    wb = load_workbook(WORKLOG_FILE)
+    ws = wb['Time Entries']
+    today = datetime.date.today()
+    monday = today - datetime.timedelta(days=today.weekday())
+    sunday = monday + datetime.timedelta(days=6)
+
+    proj_hours = {}
+    kpi_hours = {}
+    sub_hours = {}
+    total_week_hours = 0.0
+    active_days = set()
+
+    for r in range(2, ws.max_row + 1):
+        d = ws.cell(r, 1).value
+        if d is None:
+            break
+        if isinstance(d, datetime.datetime):
+            d = d.date()
+        if not (monday <= d <= sunday):
+            continue
+        active_days.add(d)
+        dur = get_duration(ws, r)
+        total_week_hours += dur
+
+        p = str(ws.cell(r, 3).value or 'General')
+        ft = str(ws.cell(r, 4).value or 'General')
+        st = str(ws.cell(r, 5).value or '')
+
+        proj_hours[p] = proj_hours.get(p, 0.0) + dur
+        kpi_hours[ft] = kpi_hours.get(ft, 0.0) + dur
+        if st:
+            sub_hours[st] = sub_hours.get(st, 0.0) + dur
+
+    subtasks = get_subtasks()
+    completed_this_week = []
+    in_progress_subtasks = []
+    for s in subtasks:
+        c_date = s.get('completed_date')
+        if c_date:
+            if hasattr(c_date, 'date'):
+                c_date = c_date.date()
+            if isinstance(c_date, datetime.date) and monday <= c_date <= sunday:
+                completed_this_week.append(s)
+        if str(s.get('status', '')).lower() in ('in progress', 'active'):
+            in_progress_subtasks.append(s)
+
+    target_hours = 37.5
+    perf_pct = min(int((total_week_hours / target_hours) * 100), 100) if total_week_hours > 0 else 0
+
+    lines = []
+    lines.append(f"### 🏆 Friday Weekly Performance Report ({monday.strftime('%d-%m')} → {sunday.strftime('%d-%m-%Y')})")
+    lines.append("")
+    lines.append(f"**Weekly Watched Time:** `{total_week_hours:.2f}h / {target_hours:.1f}h` ({perf_pct}% of target)")
+    lines.append(f"**Active Days:** `{len(active_days)}/5 days` │ **Daily Avg:** `{total_week_hours / max(len(active_days), 1):.2f}h/day`")
+    lines.append(f"**Subtasks Completed This Week:** `{len(completed_this_week)}` │ **In Progress:** `{len(in_progress_subtasks)}`")
+    lines.append("")
+
+    lines.append("#### 📁 Level 1: Projects Watched Time")
+    p_rows = []
+    for p, h in sorted(proj_hours.items(), key=lambda x: -x[1]):
+        p_rows.append([p, f"{h:.2f}h"])
+    lines.append(_table(['Project', 'Watched Time'], p_rows, aligns=['<', '>']))
+    lines.append("")
+
+    lines.append("#### 🎯 Level 2: KPIs / Father Tasks Watched Time")
+    k_rows = []
+    for ft, h in sorted(kpi_hours.items(), key=lambda x: -x[1]):
+        k_rows.append([ft, f"{h:.2f}h"])
+    lines.append(_table(['Father Task', 'Watched Time'], k_rows, aligns=['<', '>']))
+    lines.append("")
+
+    lines.append("#### 🧩 Level 3: Subtasks Status & Progress")
+    s_rows = []
+    if completed_this_week:
+        for s in completed_this_week:
+            s_rows.append([f"✅ {s['code']}", s['name'], s['project'], 'Done'])
+    for s in in_progress_subtasks:
+        s_rows.append([f"🔵 {s['code']}", s['name'], s['project'], 'In Progress'])
+    if s_rows:
+        lines.append(_table(['Code', 'Subtask', 'Project', 'Status'], s_rows, aligns=['<', '<', '<', '<']))
+    else:
+        lines.append("- *(No subtask entries logged this week)*")
+
+    report_text = "\n".join(lines)
+    print(report_text)
+    return 0
+
+
+def _table(headers, rows, col_widths=None, aligns=None, title=None, footer=None, max_widths=None):
+    """Render a GitHub-Flavored Markdown (GFM) pipe table for Discord and attached .md files."""
+    n = len(headers)
+    if aligns is None:
+        aligns = ['<'] * n
+
+    lines = []
+    if title:
+        lines.append(f"### {title}")
+        lines.append("")
+
+    lines.append("| " + " | ".join(headers) + " |")
+
+    sep = []
+    for a in aligns:
+        if a == '>':
+            sep.append("---:")
+        elif a == '^':
+            sep.append(":---:")
+        else:
+            sep.append(":---")
+    lines.append("| " + " | ".join(sep) + " |")
+
+    for row in rows:
+        row_cells = []
+        for i in range(n):
+            val = row[i] if i < len(row) and row[i] is not None else ""
+            row_cells.append(str(val))
+        lines.append("| " + " | ".join(row_cells) + " |")
+
+    if footer:
+        footer_cells = []
+        for i in range(n):
+            val = footer[i] if i < len(footer) and footer[i] is not None else ""
+            footer_cells.append(str(val))
+        lines.append("| " + " | ".join(footer_cells) + " |")
+
+    return "\n".join(lines)
 
 
 def find_next_row(ws):
@@ -193,7 +407,7 @@ def append_entry(project, task, subtask, subtask_code, category, description,
     r = find_next_row(ws)
 
     date_val = start_dt.date()
-    day_str = get_day_name(date_val)
+    day_str = DAY_NAMES[date_val.weekday()]
 
     ws.cell(r, 1).value = date_val
     ws.cell(r, 1).number_format = 'dd-mm-yyyy'
@@ -225,6 +439,8 @@ def append_entry(project, task, subtask, subtask_code, category, description,
 def cmd_start(args):
     subtask_name = getattr(args, 'subtask', None)
     subtask_code = getattr(args, 'subtask_code', None)
+    user_id = getattr(args, 'user_id', None)
+    user_name = getattr(args, 'user_name', None)
     if subtask_name:
         subtasks = get_subtasks()
         match = None
@@ -245,35 +461,71 @@ def cmd_start(args):
             args.project = match['project']
 
     state = load_state()
+    target_project = args.project or detect_project()
+    target_task = args.task or detect_branch()
+
+    existing = find_timer(
+        state,
+        project=target_project,
+        task=target_task,
+        subtask=subtask_name,
+        paused=False,
+        user_id=str(user_id) if user_id else None
+    )
+    if existing:
+        st_info = f"subtask '{subtask_name}'" if subtask_name else f"task '{target_task}'"
+        u_info = f" for user {user_name}" if user_name else ""
+        print(f"Error: A timer for {st_info} is already running (Timer #{existing['id']}){u_info}. Stop or pause it first.")
+        return 1
+
     now = datetime.datetime.now()
     info = {
         'id': _next_timer_id(),
+        'user_id': str(user_id) if user_id else None,
+        'user_name': str(user_name) if user_name else None,
         'accumulated_seconds': 0,
         'segment_start': now.isoformat(),
         'paused': False,
-        'project': args.project or detect_project(),
-        'task': args.task or detect_branch(),
+        'project': target_project,
+        'task': target_task,
         'subtask': subtask_name,
         'subtask_code': subtask_code,
-        'category': args.category or 'Development',
-        'description': args.description or detect_commit_msg(),
+        'category': getattr(args, 'category', None) or 'Development',
+        'description': getattr(args, 'description', None) or detect_commit_msg(),
     }
     state.setdefault('timers', []).append(info)
     save_state(state)
     running = len(find_timers(state, paused=False))
-    print(f"Timer #{info['id']} started at {now.strftime('%H:%M:%S')}")
-    print(f"  Active timers: {running}")
-    if info['project']:
-        print(f"  Project:  {info['project']}")
-    if info['task']:
-        print(f"  Task:     {info['task']}")
+    rows = []
+    if info['user_name']:
+        rows.append(['User', info['user_name']])
+    rows.extend([
+        ['Timer',    f"#{info['id']}"],
+        ['Started',  now.strftime('%H:%M:%S')],
+        ['Project',  info['project'] or '—'],
+        ['Task',     info['task'] or '—'],
+    ])
     if info['subtask']:
-        print(f"  Subtask:  {info['subtask']} ({info['subtask_code']})")
+        sub_d = f"{info['subtask']} ({info['subtask_code']})" if info['subtask_code'] else info['subtask']
+        rows.append(['Subtask', sub_d])
+    rows.append(['Category', info['category'] or '—'])
     if info['description']:
-        print(f"  Desc:     {info['description']}")
+        rows.append(['Desc', info['description']])
+    rows.append(['Active', str(running)])
+    print(_table(['Field', 'Value'], rows, [10, 38], title='▶ Timer Started'))
     if not info['project'] or not info['task']:
-        print("  (Use -p PROJECT -t TASK to override auto-detect)")
+        print("(Use -p PROJECT -t TASK to override auto-detect)")
     return 0
+
+
+def _safe_input(prompt, default=""):
+    if not sys.stdin or not hasattr(sys.stdin, 'isatty') or not sys.stdin.isatty():
+        return default
+    try:
+        val = input(prompt).strip()
+        return val if val else default
+    except (EOFError, KeyboardInterrupt, OSError):
+        return default
 
 
 def cmd_stop(args):
@@ -283,12 +535,89 @@ def cmd_stop(args):
         print("No timers running. Use 'start' first.")
         return 1
 
-    # Find matching timer: by flags, or most recent non-paused, or most recent overall
-    timer = find_timer(state, project=args.project, task=args.task, subtask=args.subtask)
-    if not timer:
+    stop_all = getattr(args, 'all', False) or getattr(args, 'stop_all', False)
+    user_id = getattr(args, 'user_id', None)
+
+    if stop_all:
+        target_timers = list(timers)
+        if user_id:
+            user_t = [t for t in target_timers if str(t.get('user_id', '')) == str(user_id)]
+            if user_t:
+                target_timers = user_t
+
+        count = 0
+        for t in target_timers:
+            dummy_args = argparse.Namespace(
+                project=t.get('project'),
+                task=t.get('task'),
+                subtask=t.get('subtask'),
+                subtask_code=t.get('subtask_code'),
+                category=t.get('category'),
+                description=t.get('description'),
+                user_id=t.get('user_id'),
+                user_name=t.get('user_name'),
+                timer_id=t.get('id'),
+                all=False,
+                stop_all=False
+            )
+            ret = cmd_stop_single(dummy_args)
+            if ret == 0:
+                count += 1
+        print(f"⏹️ Successfully stopped and saved {count} timer(s).")
+        return 0
+
+    return cmd_stop_single(args)
+
+
+def cmd_stop_single(args):
+    state = load_state()
+    timers = state.get('timers', [])
+    if not timers:
+        print("No timers running. Use 'start' first.")
+        return 1
+
+    user_id = getattr(args, 'user_id', None)
+    timer_id = getattr(args, 'timer_id', None)
+    subtask = getattr(args, 'subtask', None)
+    project = getattr(args, 'project', None)
+    task = getattr(args, 'task', None)
+
+    timer = None
+    if timer_id:
+        timer = find_timer(state, timer_id=timer_id)
+
+    if not timer and subtask:
+        if user_id:
+            timer = find_timer(state, subtask=subtask, user_id=user_id)
+        if not timer:
+            timer = find_timer(state, subtask=subtask)
+
+    if not timer and (project or task):
+        if user_id:
+            timer = find_timer(state, project=project, task=task, user_id=user_id)
+        if not timer:
+            timer = find_timer(state, project=project, task=task)
+
+    if not timer and user_id:
+        timer = find_timer(state, paused=False, user_id=user_id)
+        if not timer:
+            timer = find_timer(state, paused=True, user_id=user_id)
+        if not timer:
+            timer = find_timer(state, user_id=user_id)
+        if not timer:
+            print("No active or paused timers found for your account.")
+            return 1
+
+    if not timer and not user_id:
         timer = find_timer(state, paused=False)
+        if not timer:
+            timer = find_timer(state, paused=True)
+        if not timer and timers:
+            timer = timers[-1]
+
     if not timer:
-        timer = timers[-1]
+        print("No timer found matching the criteria.")
+        return 1
 
     now = datetime.datetime.now()
     acc = get_elapsed(timer)
@@ -323,12 +652,15 @@ def cmd_stop(args):
             total_break_min += p['duration_min']
         break_info = '; '.join(parts)
 
-    project = args.project or timer.get('project') or detect_project() or input("Project: ")
-    task = args.task or timer.get('task') or detect_branch() or input("Father Task: ")
+    project = args.project or timer.get('project') or detect_project() or _safe_input("Project: ", "General")
+    task = args.task or timer.get('task') or detect_branch() or _safe_input("Father Task: ", "Task")
     subtask = args.subtask or timer.get('subtask')
     subtask_code = args.subtask_code or timer.get('subtask_code')
     category = args.category or timer.get('category') or 'Development'
-    description = args.description or timer.get('description') or input("Description: ")
+    description = args.description or timer.get('description') or _safe_input("Description: ", "Work completed")
+    u_name = timer.get('user_name') or getattr(args, 'user_name', None)
+    if u_name and not description.startswith(f"[{u_name}]"):
+        description = f"[{u_name}] {description}"
 
     if subtask and not subtask_code:
         wb_sc = load_workbook(WORKLOG_FILE)
@@ -336,28 +668,54 @@ def cmd_stop(args):
 
     duration = acc / 3600
     tid = timer.get('id', '?')
-    print(f"Timer #{tid} stopped at {end_dt.strftime('%H:%M:%S')}")
-    print(f"  Duration: {duration:.2f}h ({start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')})")
-    print(f"  Project:  {project}")
-    print(f"  Task:     {task}")
+    rows = []
+    if u_name:
+        rows.append(['User', u_name])
+    rows.extend([
+        ['Timer',    f'#{tid}'],
+        ['Time',     f"{start_dt.strftime('%H:%M')} → {end_dt.strftime('%H:%M')}"],
+        ['Duration', f'{duration:.2f}h'],
+        ['Project',  project],
+        ['Task',     task],
+    ])
     if subtask:
-        print(f"  Sub Task: {subtask}")
-    print(f"  Category: {category}")
-    print(f"  Desc:     {description}")
+        sub_d = f'{subtask} ({subtask_code})' if subtask_code else subtask
+        rows.append(['Subtask', sub_d])
+    rows.append(['Category', category])
+    rows.append(['Desc', description])
     if break_info:
-        print(f"  Breaks:   {break_info}")
+        rows.append(['Breaks', break_info])
         if total_break_min >= 60:
-            print(f"  Break total: {total_break_min}m ({total_break_min/60:.1f}h) off-task")
+            rows.append(['Break total', f'{total_break_min}m ({total_break_min/60:.1f}h)'])
+    print(_table(['Field', 'Value'], rows, [11, 38], title='■ Timer Stopped'))
 
     append_entry(project, task, subtask, subtask_code, category, description, start_dt, end_dt, break_info)
     gsheets.sync_time_entry(project, task, subtask, subtask_code, category, description,
                             start_dt.strftime('%H:%M'), end_dt.strftime('%H:%M'), duration,
                             break_info or '', start_dt.date())
+
+    # Mark associated subtask as 'Hung' if not already Done
+    if subtask:
+        try:
+            wb_sub = load_workbook(WORKLOG_FILE)
+            ws_sub = wb_sub['SubTasks']
+            for r_sub in range(2, ws_sub.max_row + 1):
+                s_name = ws_sub.cell(r_sub, 2).value
+                if s_name and str(s_name).strip() == subtask:
+                    curr_st = str(ws_sub.cell(r_sub, 5).value or '')
+                    if curr_st.lower() != 'done':
+                        ws_sub.cell(r_sub, 5).value = 'Hung'
+                        wb_sub.save(WORKLOG_FILE)
+                        gsheets.sync_subtask_update(subtask, 'status', 'Hung')
+                    break
+        except Exception as e:
+            print(f"Warning: Could not update subtask status to Hung: {e}")
+
     webhook.send(project=project, task=task, duration_h=duration,
                  description=description, category=category, subtask=subtask,
                  break_info=break_info,
                  start_time=start_dt.strftime('%H:%M'), end_time=end_dt.strftime('%H:%M'))
-    remove_timer(state, timer['id'])
+    remove_timer(state, timer)
     save_state(state)
     remaining = len(state.get('timers', []))
     if remaining:
@@ -371,9 +729,24 @@ def cmd_cancel(args):
     if not timers:
         print("No timer running.")
         return 1
-    timer = find_timer(state, paused=False)
+    user_id = getattr(args, 'user_id', None)
+    timer = None
+    if user_id:
+        timer = find_timer(state, user_id=user_id, paused=False)
+        if not timer:
+            timer = find_timer(state, user_id=user_id)
+        if not timer:
+            print("No active or paused timers found for your account.")
+            return 1
+    else:
+        timer = find_timer(state, paused=False)
+        if not timer:
+            timer = timers[-1]
+
     if not timer:
-        timer = timers[-1]
+        print("No timer found to cancel.")
+        return 1
+
     acc = get_elapsed(timer)
     tid = timer.get('id', '?')
     print(f"Cancelled timer #{tid} ({int(acc)//60}m discarded)")
@@ -385,41 +758,86 @@ def cmd_cancel(args):
 def cmd_status(args):
     state = load_state()
     timers = state.get('timers', [])
+    user_id = getattr(args, 'user_id', None)
+    if user_id:
+        timers = [t for t in timers if str(t.get('user_id', '')) == str(user_id)]
     if not timers:
-        print("No timers running.")
+        print("No active or paused timers found for your account.")
         return 0
 
-    paused_timers = find_timers(state, paused=True)
-    active_timers = find_timers(state, paused=False)
+    today = datetime.date.today()
+    timers_sorted = sorted(timers, key=lambda t: t.get('segment_start', ''))
+    has_users = any(t.get('user_name') for t in timers)
 
-    if active_timers:
-        print(f"Active timers ({len(active_timers)}):")
-        for t in active_timers:
-            acc = get_elapsed(t)
-            mins = int(acc) // 60
-            sd = datetime.datetime.fromisoformat(t['segment_start'])
-            desc = t.get('description', '') or ''
-            print(f"  #{t['id']}: {sd.strftime('%H:%M')} ({mins}m) "
-                  f"Proj={t.get('project','?')} Task={t.get('task','?')} {desc}")
+    active_count = 0
+    paused_count = 0
+    hung_count = 0
 
-    if paused_timers:
-        print(f"Paused timers ({len(paused_timers)}):")
-        for t in paused_timers:
-            acc = get_elapsed(t)
-            mins = int(acc) // 60
+    rows = []
+    for t in timers_sorted:
+        sd = datetime.datetime.fromisoformat(t['segment_start'])
+        is_hung = sd.date() < today
+        acc = get_elapsed(t)
+        h, m = int(acc) // 3600, (int(acc) % 3600) // 60
+        dur = f"{h}h{m:02d}m" if h else f"{m}m"
+
+        proj = t.get('project', '?')
+        task = t.get('task', '?')
+        subtask = t.get('subtask', '') or '—'
+        sub_code = t.get('subtask_code', '') or ''
+        sub_str = f"{subtask}({sub_code})" if sub_code and subtask != '—' else subtask
+        cat = t.get('category', '') or '—'
+        desc = t.get('description', '') or '—'
+        is_paused = t.get('paused', False)
+
+        if is_hung and not is_paused:
+            status = '⚠️ HUNG'
+            hung_count += 1
+        elif is_paused:
             reason = t.get('pause_reason', 'break')
-            print(f"  #{t['id']}: PAUSED ({mins}m) '{reason}' "
-                  f"Proj={t.get('project','?')} Task={t.get('task','?')}")
+            status = f'⏸️ {reason}'
+            paused_count += 1
+        else:
+            status = '🟢 RUN'
+            active_count += 1
 
+        row = [t.get('id','?')]
+        if has_users:
+            row.append(t.get('user_name', '') or '—')
+        row.extend([dur, sd.strftime('%H:%M'), status, proj, task, sub_str, cat, desc])
+        rows.append(row)
+
+    headers = ['ID', 'User', 'Time', 'Start', 'Status', 'Project', 'Task', 'Subtask', 'Category', 'Desc'] if has_users else ['ID', 'Time', 'Start', 'Status', 'Project', 'Task', 'Subtask', 'Category', 'Desc']
+    widths = [3, 10, 6, 5, 9, 10, 18, 15, 10, 20] if has_users else [3, 6, 5, 9, 10, 18, 15, 10, 20]
+    aligns = ['<'] * len(headers)
+
+    print(_table(
+        headers,
+        rows,
+        widths,
+        aligns,
+        title='Timer Status',
+    ))
+    print(f"\n🟢 Active: {active_count} │ ⏸️ Paused: {paused_count} │ ⚠️ Hung: {hung_count}")
     return 0
 
 
 def cmd_pause(args):
     state = load_state()
-    timer = find_timer(state, paused=False)
-    if not timer:
-        print("No active timer to pause.")
-        return 1
+    user_id = getattr(args, 'user_id', None)
+    if user_id:
+        timer = find_timer(state, project=getattr(args, 'project', None), task=getattr(args, 'task', None), subtask=getattr(args, 'subtask', None), user_id=user_id, paused=False)
+        if not timer:
+            timer = find_timer(state, user_id=user_id, paused=False)
+        if not timer:
+            print("No active timer to pause for your account.")
+            return 1
+    else:
+        timer = find_timer(state, project=getattr(args, 'project', None), task=getattr(args, 'task', None), subtask=getattr(args, 'subtask', None), paused=False)
+        if not timer:
+            print("No active timer to pause.")
+            return 1
+
     if timer.get('paused', False):
         print(f"Timer #{timer['id']} is already paused. Use 'continue' to resume.")
         return 1
@@ -442,10 +860,20 @@ def cmd_pause(args):
 
 def cmd_continue(args):
     state = load_state()
-    timer = find_timer(state, paused=True)
-    if not timer:
-        print("No paused timer found.")
-        return 1
+    user_id = getattr(args, 'user_id', None)
+    if user_id:
+        timer = find_timer(state, project=getattr(args, 'project', None), task=getattr(args, 'task', None), subtask=getattr(args, 'subtask', None), user_id=user_id, paused=True)
+        if not timer:
+            timer = find_timer(state, user_id=user_id, paused=True)
+        if not timer:
+            print("No paused timer found for your account.")
+            return 1
+    else:
+        timer = find_timer(state, project=getattr(args, 'project', None), task=getattr(args, 'task', None), subtask=getattr(args, 'subtask', None), paused=True)
+        if not timer:
+            print("No paused timer found.")
+            return 1
+
     if not timer.get('paused', False):
         print(f"Timer #{timer['id']} is not paused.")
         return 1
@@ -477,6 +905,31 @@ def cmd_continue(args):
     return 0
 
 
+def parse_date_val(val):
+    """Safely parse date value from cell (datetime, date, or str)."""
+    if val is None:
+        return None
+    if isinstance(val, datetime.datetime):
+        return val.date()
+    if isinstance(val, datetime.date):
+        return val
+    if isinstance(val, str):
+        val = val.strip()
+        if not val:
+            return None
+        try:
+            val_clean = val.split(' ')[0]
+            if '-' in val_clean:
+                parts = val_clean.split('-')
+                if len(parts[0]) == 4:  # YYYY-MM-DD
+                    return datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+                else:  # DD-MM-YYYY
+                    return datetime.date(int(parts[2]), int(parts[1]), int(parts[0]))
+        except Exception:
+            pass
+    return None
+
+
 def get_duration(ws, r):
     """Get numeric duration from row. Computes from start/end if formula not evaluated."""
     dur = ws.cell(r, 10).value
@@ -485,19 +938,37 @@ def get_duration(ws, r):
     start = ws.cell(r, 8).value
     end = ws.cell(r, 9).value
     if start and end:
+        if isinstance(start, str):
+            try:
+                parts = start.strip().split(':')
+                start = datetime.time(int(parts[0]), int(parts[1]), int(float(parts[2])) if len(parts) > 2 else 0)
+            except Exception:
+                pass
+        if isinstance(end, str):
+            try:
+                parts = end.strip().split(':')
+                end = datetime.time(int(parts[0]), int(parts[1]), int(float(parts[2])) if len(parts) > 2 else 0)
+            except Exception:
+                pass
+
         if isinstance(start, datetime.datetime):
             s = start
         elif isinstance(start, datetime.time):
             s = datetime.datetime.combine(datetime.date.today(), start)
         else:
             return 0.0
+
         if isinstance(end, datetime.datetime):
             e = end
         elif isinstance(end, datetime.time):
             e = datetime.datetime.combine(datetime.date.today(), end)
         else:
             return 0.0
-        return max(0, (e - s).total_seconds() / 3600)
+
+        sec = (e - s).total_seconds()
+        if sec < 0:
+            sec += 86400  # Crosses midnight (e.g. 23:00 to 01:00)
+        return sec / 3600.0
     return 0.0
 
 
@@ -509,20 +980,15 @@ def cmd_today(args):
     ws = wb['Time Entries']
     today = datetime.date.today()
     total = 0.0
-    count = 0
 
     entries = []
     for r in range(2, ws.max_row + 1):
-        d = ws.cell(r, 1).value
-        if d is None:
-            break
-        if isinstance(d, datetime.datetime):
-            d = d.date()
-        if d != today:
+        raw_d = ws.cell(r, 1).value
+        d = parse_date_val(raw_d)
+        if not d or d != today:
             continue
         dur = get_duration(ws, r)
         total += dur
-        count += 1
         entries.append({
             'proj': str(ws.cell(r, 3).value or ''),
             'task': str(ws.cell(r, 4).value or ''),
@@ -530,27 +996,29 @@ def cmd_today(args):
             'dur': dur,
         })
 
-    print(f"Today ({today.strftime('%d-%m-%Y')}):")
     by_project = {}
     for e in entries:
         by_project.setdefault(e['proj'], []).append(e)
 
     for proj in sorted(by_project.keys()):
-        print(f"  [{proj}]")
-        print(f"    {'Task':<25} {'Hours':>6} {'Desc':<30}")
-        print(f"    {'-'*63}")
-        for e in by_project[proj]:
-            print(f"    {e['task']:<25} {e['dur']:>6.2f} {e['desc']:<30}")
-        proj_total = sum(e['dur'] for e in by_project[proj])
-        print(f"    {'Project total':<25} {proj_total:>6.2f}")
+        proj_entries = by_project[proj]
+        tbl_rows = []
+        for e in proj_entries:
+            tbl_rows.append([e['task'], f"{e['dur']:.2f}", e['desc']])
+        proj_total = sum(e['dur'] for e in proj_entries)
+        print(_table(
+            ['Task', 'Hours', 'Description'],
+            tbl_rows, [20, 6, 22],
+            ['<', '>', '<'],
+            title=f'Today {today.strftime("%d-%m-%Y")} [{proj}]',
+            footer=['Subtotal', f'{proj_total:.2f}', ''],
+        ))
         print()
 
-    print(f"{'ALL TOTAL':<15} {total:>6.2f}h")
-    if total >= 7.5:
-        print("  Full day!")
-    else:
-        rem = 7.5 - total
-        print(f"  Partial day: {rem:.2f}h remaining")
+    pct = int(min((total / 7.5) * 100, 100)) if total > 0 else 0
+    filled = int(min((total / 7.5) * 14, 14)) if total > 0 else 0
+    bar = ('█' * filled) + ('░' * (14 - filled))
+    print(f"TOTAL: {total:.2f}h / 7.5h  {bar} {pct}%")
     return 0
 
 
@@ -565,19 +1033,15 @@ def cmd_week(args):
     monday = today - datetime.timedelta(days=today.weekday())
     sunday = monday + datetime.timedelta(days=6)
 
-    print(f"Week: {monday.strftime('%d-%m-%Y')} - {sunday.strftime('%d-%m-%Y')}")
-    print()
-
     by_project = {}
     total = 0.0
+    days_set = set()
     for r in range(2, ws.max_row + 1):
-        d = ws.cell(r, 1).value
-        if d is None:
-            break
-        if isinstance(d, datetime.datetime):
-            d = d.date()
-        if not (monday <= d <= sunday):
+        raw_d = ws.cell(r, 1).value
+        d = parse_date_val(raw_d)
+        if not d or not (monday <= d <= sunday):
             continue
+        days_set.add(d)
         dur = get_duration(ws, r)
         total += dur
         proj = str(ws.cell(r, 3).value or '?')
@@ -589,24 +1053,21 @@ def cmd_week(args):
     for proj in sorted(by_project.keys()):
         tasks = by_project[proj]
         proj_total = sum(tasks.values())
-        print(f"  [{proj}] ({proj_total:.2f}h)")
+        tbl_rows = []
         for t, h in sorted(tasks.items(), key=lambda x: -x[1]):
-            print(f"    {t:<30} {h:>6.2f}")
+            tbl_rows.append([t, f'{h:.2f}'])
+        print(_table(
+            ['Task', 'Hours'],
+            tbl_rows, [28, 7],
+            ['<', '>'],
+            title=f'Week {monday.strftime("%d-%m")} → {sunday.strftime("%d-%m-%Y")} [{proj}]',
+            footer=['Subtotal', f'{proj_total:.2f}'],
+        ))
         print()
 
-    print(f"{'WEEK TOTAL':<35} {total:>6.2f}h")
-    if total:
-        days_set = set()
-        for r in range(2, ws.max_row + 1):
-            d = ws.cell(r, 1).value
-            if d is None:
-                break
-            if isinstance(d, datetime.datetime):
-                d = d.date()
-            if monday <= d <= sunday:
-                days_set.add(d)
-        days_worked = len(days_set)
-        print(f"  Days active: {days_worked}, Avg: {total / max(days_worked, 1):.2f}h/day")
+    days_worked = len(days_set)
+    avg = total / max(days_worked, 1)
+    print(f"WEEK TOTAL: {total:.2f}h │ {days_worked} days │ Avg: {avg:.2f}h/day")
     return 0
 
 
@@ -748,26 +1209,37 @@ def cmd_kpi_list(args):
         print("Then add KPIs: kpi add -t NAME -p PROJECT -d DAYS")
         return 0
 
-    # Group by project
     by_project = {}
     for k in kpis:
         by_project.setdefault(k['project'], []).append(k)
 
     total_all = 0.0
     for proj_name in sorted(by_project.keys()):
-        print(f"\n[{proj_name}]")
-        print(f"{'Code':<18} {'Father Task':<25} {'Deadline':<10} {'Hours':>8} {'Status':<15}")
-        print("-" * 78)
+        tbl_rows = []
         proj_total = 0.0
         for k in by_project[proj_name]:
             hours = get_total_hours_for_task(k['name'])
             proj_total += hours
             dl = k['deadline_days']
             dl_str = f"{dl}d" if dl else '—'
-            print(f"{k['code']:<18} {k['name']:<25} {dl_str:<10} {hours:>8.2f} {k['status']:<15}")
-        print(f"{'Project total':<18} {'':25} {'':10} {proj_total:>8.2f}")
+            st = k['status']
+            if st.lower() == 'done':
+                emoji = '✅'
+            elif st.lower() in ('active', 'in progress'):
+                emoji = '🔵'
+            else:
+                emoji = '⏳'
+            tbl_rows.append([f'{emoji} {k["code"]}', k['name'], dl_str, f'{hours:.2f}', st])
+        print(_table(
+            ['Code', 'Task', 'Days', 'Hours', 'Status'],
+            tbl_rows, [15, 20, 4, 6, 12],
+            ['<', '<', '<', '>', '<'],
+            title=f'KPIs [{proj_name}]',
+            footer=['', 'Subtotal', '', f'{proj_total:.2f}', ''],
+        ))
+        print()
         total_all += proj_total
-    print(f"\nGrand total: {total_all:.2f}h across {len(kpis)} KPIs")
+    print(f"Grand total: {total_all:.2f}h │ {len(kpis)} KPIs")
     return 0
 
 
@@ -830,6 +1302,25 @@ def cmd_kpi_done(args):
     if not found:
         print(f"KPI '{args.name}' not found.")
         return 1
+
+    # Stop any active or paused timer running for this KPI/Task first
+    state = load_state()
+    timer = find_timer(state, task=args.name)
+    if timer:
+        dummy_stop_args = argparse.Namespace(
+            timer_id=timer.get('id'),
+            subtask=timer.get('subtask'),
+            project=timer.get('project'),
+            task=args.name,
+            user_id=timer.get('user_id'),
+            user_name=timer.get('user_name'),
+            category=timer.get('category'),
+            description=timer.get('description'),
+            all=False,
+            stop_all=False
+        )
+        cmd_stop_single(dummy_stop_args)
+
     wb = load_workbook(WORKLOG_FILE)
     ws = wb['KPIs']
     r = found[0]['row']
@@ -839,7 +1330,7 @@ def cmd_kpi_done(args):
     wb.save(WORKLOG_FILE)
     print(f"KPI '{args.name}' marked as Done.")
     gsheets.sync_kpi_update(args.name, 'status', 'Done')
-    gsheets.sync_kpi_update(args.name, 'completed_date', datetime.date.today().strftime('%d-%m-%Y'))
+    gsheets.sync_kpi_update(args.name, 'completed_date', datetime.date.today().strftime('%Y-%m-%d'))
     return 0
 
 
@@ -883,15 +1374,23 @@ def cmd_kpi_rename(args):
         return 0
     wb = load_workbook(WORKLOG_FILE)
     ws_kpi = wb['KPIs']
+    ws_st = wb['SubTasks']
     ws_te = wb['Time Entries']
     r = found[0]['row']
     ws_kpi.cell(r, 2).value = new_name
+
+    for r2 in range(2, ws_st.max_row + 1):
+        old_val = ws_st.cell(r2, 3).value
+        if old_val and str(old_val).strip().lower() == args.name.strip().lower():
+            ws_st.cell(r2, 3).value = new_name
+
     for r2 in range(2, ws_te.max_row + 1):
         old_val = ws_te.cell(r2, 4).value
-        if old_val and str(old_val).strip() == args.name:
+        if old_val and str(old_val).strip().lower() == args.name.strip().lower():
             ws_te.cell(r2, 4).value = new_name
+
     wb.save(WORKLOG_FILE)
-    print(f"Renamed '{args.name}' -> '{new_name}' (updated in KPIs + Time Entries)")
+    print(f"Renamed KPI '{args.name}' -> '{new_name}' (updated in KPIs, SubTasks, Time Entries)")
     gsheets.sync_kpi_rename(args.name, new_name)
     gsheets.sync_kpi_rename_propagate(args.name, new_name)
     return 0
@@ -980,13 +1479,16 @@ def cmd_tasks(args):
             return 0
         total = sum(e['dur'] for e in entries)
         proj = entries[0]['proj'] if entries else ''
-        print(f"[{proj}] Father Task: {ft}")
-        print(f"{'Sub Task':<20} {'Sub Task Code':<15} {'Category':<15} {'Hours':>8} {'Description':<30}")
-        print("-" * 90)
+        tbl_rows = []
         for e in entries:
-            print(f"{e['sub']:<20} {e['sc']:<15} {e['cat']:<15} {e['dur']:>8.2f} {e['desc']:<30}")
-        print("-" * 90)
-        print(f"{'TOTAL':<20} {'':<15} {'':<15} {total:>8.2f}")
+            tbl_rows.append([e['sub'] or '—', e['sc'] or '—', e['cat'], f"{e['dur']:.2f}", e['desc']])
+        print(_table(
+            ['SubTask', 'Code', 'Category', 'Hours', 'Description'],
+            tbl_rows, [16, 13, 12, 6, 22],
+            ['<', '<', '<', '>', '<'],
+            title=f'{ft} [{proj}]',
+            footer=['TOTAL', '', '', f'{total:.2f}', ''],
+        ))
     else:
         if not groups:
             print("No time entries found.")
@@ -1001,17 +1503,22 @@ def cmd_tasks(args):
         total_all = 0.0
         for proj in sorted(by_project.keys()):
             tasks = by_project[proj]
-            print(f"\n[{proj}]")
-            print(f"{'Father Task':<25} {'Entries':>8} {'Hours':>8}")
-            print("-" * 43)
+            tbl_rows = []
             proj_total = 0.0
             for ft, entries in sorted(tasks.items()):
                 total = sum(e['dur'] for e in entries)
                 proj_total += total
-                print(f"{ft:<25} {len(entries):>8} {total:>8.2f}")
-            print(f"{'Project total':<25} {'':>8} {proj_total:>8.2f}")
+                tbl_rows.append([ft, str(len(entries)), f'{total:.2f}'])
+            print(_table(
+                ['Father Task', 'Entries', 'Hours'],
+                tbl_rows, [25, 7, 7],
+                ['<', '>', '>'],
+                title=f'Tasks [{proj}]',
+                footer=['Total', '', f'{proj_total:.2f}'],
+            ))
+            print()
             total_all += proj_total
-        print(f"\nGrand total: {total_all:.2f}h")
+        print(f"Grand total: {total_all:.2f}h")
     return 0
 
 
@@ -1087,6 +1594,13 @@ def cmd_sub_list(args):
     if not os.path.exists(WORKLOG_FILE):
         print(f"No {WORKLOG_FILE} found.")
         return 1
+        
+    subtasks = get_subtasks()
+    st_status = {}
+    if subtasks:
+        for s in subtasks:
+            st_status[s['name']] = s['status']
+
     wb = load_workbook(WORKLOG_FILE)
     ws = wb['Time Entries']
     seen = {}
@@ -1103,14 +1617,33 @@ def cmd_sub_list(args):
         seen.setdefault(st, {'father_tasks': set(), 'total_hours': 0.0})
         seen[st]['father_tasks'].add(ft)
         seen[st]['total_hours'] += dur
+        
     if not seen:
         print("No subtasks found.")
         return 0
-    print(f"{'Subtask':<25} {'Father Tasks':<35} {'Hours':>8}")
-    print('-' * 70)
+
+    tbl_rows = []
     for name, info in sorted(seen.items()):
         fts = ', '.join(sorted(info['father_tasks']))
-        print(f"{name:<25} {fts:<35} {info['total_hours']:>8.2f}")
+        if len(fts) > 20:
+            fts = fts[:17] + '...'
+        status = st_status.get(name, '')
+        if status:
+            if status.lower() == 'done':
+                emoji = '✅'
+            elif status.lower() in ('active', 'in progress'):
+                emoji = '🔵'
+            else:
+                emoji = '⏳'
+        else:
+            emoji = '⚪'
+        tbl_rows.append([f'{emoji} {name}', fts, status or '—', f"{info['total_hours']:.2f}"])
+    print(_table(
+        ['Subtask', 'Father Task', 'Status', 'Hours'],
+        tbl_rows, [22, 20, 11, 6],
+        ['<', '<', '<', '>'],
+        title='Subtasks',
+    ))
     return 0
 
 
@@ -1119,15 +1652,30 @@ def cmd_sub_rename(args):
         print(f"No {WORKLOG_FILE} found.")
         return 1
     wb = load_workbook(WORKLOG_FILE)
-    ws = wb['Time Entries']
-    count = 0
-    for r in range(2, ws.max_row + 1):
-        st = ws.cell(r, 5).value
-        if st and str(st).strip() == args.subtask:
-            ws.cell(r, 5).value = args.new_name
-            count += 1
+    ws_st = wb['SubTasks']
+    ws_te = wb['Time Entries']
+
+    # Update SubTasks sheet definition
+    s_clean = args.subtask.strip().lower()
+    st_count = 0
+    for r in range(2, ws_st.max_row + 1):
+        s_name = ws_st.cell(r, 2).value
+        s_code = ws_st.cell(r, 1).value
+        if s_name and (str(s_name).strip().lower() == s_clean or str(s_code or '').strip().lower() == s_clean):
+            ws_st.cell(r, 2).value = args.new_name
+            st_count += 1
+
+    # Update Time Entries sheet
+    te_count = 0
+    for r in range(2, ws_te.max_row + 1):
+        st = ws_te.cell(r, 5).value
+        sc = ws_te.cell(r, 6).value
+        if st and (str(st).strip().lower() == s_clean or str(sc or '').strip().lower() == s_clean):
+            ws_te.cell(r, 5).value = args.new_name
+            te_count += 1
+
     wb.save(WORKLOG_FILE)
-    print(f"Renamed {count} subtask entries '{args.subtask}' -> '{args.new_name}'.")
+    print(f"Renamed subtask '{args.subtask}' -> '{args.new_name}' (updated in SubTasks and {te_count} Time Entries).")
     gsheets.sync_subtask_rename(args.subtask, args.new_name)
     return 0
 
@@ -1137,15 +1685,32 @@ def cmd_sub_delete(args):
         print(f"No {WORKLOG_FILE} found.")
         return 1
     wb = load_workbook(WORKLOG_FILE)
-    ws = wb['Time Entries']
-    count = 0
-    for r in range(2, ws.max_row + 1):
-        st = ws.cell(r, 5).value
-        if st and str(st).strip() == args.subtask:
-            ws.cell(r, 5).value = None
-            count += 1
+    ws_st = wb['SubTasks']
+    ws_te = wb['Time Entries']
+
+    s_clean = args.subtask.strip().lower()
+    # Delete row in SubTasks sheet
+    rows_to_delete = []
+    for r in range(2, ws_st.max_row + 1):
+        s_name = ws_st.cell(r, 2).value
+        s_code = ws_st.cell(r, 1).value
+        if s_name and (str(s_name).strip().lower() == s_clean or str(s_code or '').strip().lower() == s_clean):
+            rows_to_delete.append(r)
+
+    for r in reversed(rows_to_delete):
+        ws_st.delete_rows(r)
+
+    # Clear matching Time Entries subtask field
+    te_count = 0
+    for r in range(2, ws_te.max_row + 1):
+        st = ws_te.cell(r, 5).value
+        sc = ws_te.cell(r, 6).value
+        if st and (str(st).strip().lower() == s_clean or str(sc or '').strip().lower() == s_clean):
+            ws_te.cell(r, 5).value = None
+            te_count += 1
+
     wb.save(WORKLOG_FILE)
-    print(f"Cleared {count} subtask entries matching '{args.subtask}'.")
+    print(f"Deleted subtask '{args.subtask}' ({len(rows_to_delete)} subtask row removed, {te_count} time entries unlinked).")
     gsheets.sync_subtask_delete(args.subtask)
     return 0
 
@@ -1216,6 +1781,12 @@ def cmd_sub_edit(args):
     if args.new_name is not None:
         ws.cell(r, 2).value = args.new_name
         changed.append(f"name={args.new_name}")
+        ws_te = wb['Time Entries']
+        s_clean = args.subtask.strip().lower()
+        for r2 in range(2, ws_te.max_row + 1):
+            st = ws_te.cell(r2, 5).value
+            if st and str(st).strip().lower() == s_clean:
+                ws_te.cell(r2, 5).value = args.new_name
     if args.task is not None:
         ws.cell(r, 3).value = args.task
         changed.append(f"father_task={args.task}")
@@ -1243,6 +1814,25 @@ def cmd_sub_done(args):
     if not found:
         print(f"Subtask '{args.subtask}' not found.")
         return 1
+
+    # Stop any active or paused timer running for this subtask first
+    state = load_state()
+    timer = find_timer(state, subtask=args.subtask)
+    if timer:
+        dummy_stop_args = argparse.Namespace(
+            timer_id=timer.get('id'),
+            subtask=args.subtask,
+            project=timer.get('project'),
+            task=timer.get('task'),
+            user_id=timer.get('user_id'),
+            user_name=timer.get('user_name'),
+            category=timer.get('category'),
+            description=timer.get('description'),
+            all=False,
+            stop_all=False
+        )
+        cmd_stop_single(dummy_stop_args)
+
     wb = load_workbook(WORKLOG_FILE)
     ws = wb['SubTasks']
     r = found[0]['row']
@@ -1252,7 +1842,7 @@ def cmd_sub_done(args):
     wb.save(WORKLOG_FILE)
     print(f"Subtask '{args.subtask}' marked as Done.")
     gsheets.sync_subtask_update(args.subtask, 'status', 'Done')
-    gsheets.sync_subtask_update(args.subtask, 'completed_date', datetime.date.today().strftime('%d-%m-%Y'))
+    gsheets.sync_subtask_update(args.subtask, 'completed_date', datetime.date.today().strftime('%Y-%m-%d'))
     return 0
 
 
@@ -1271,20 +1861,31 @@ def cmd_sub_status(args):
     done_all = 0
     for key in sorted(by_father.keys()):
         items = by_father[key]
-        print(f"\n[{key}]")
-        print(f"{'Code':<20} {'Subtask':<25} {'Status':<12} {'Completed':<15}")
-        print("-" * 74)
+        tbl_rows = []
         for s in items:
             comp = ''
             if s['completed_date']:
                 comp = s['completed_date'].strftime('%d-%m-%Y') if hasattr(s['completed_date'], 'strftime') else str(s['completed_date'])
-            print(f"{s['code']:<20} {s['name']:<25} {s['status']:<12} {comp:<15}")
+            st = s['status']
+            if st.lower() == 'done':
+                emoji = '✅'
+            elif st.lower() in ('active', 'in progress'):
+                emoji = '🔵'
+            else:
+                emoji = '⏳'
+            tbl_rows.append([f'{emoji} {s["code"]}', s['name'], st, comp or '—'])
         done_sub = sum(1 for s in items if s['status'] == 'Done')
-        print(f"{'Done: ' + str(done_sub) + '/' + str(len(items)):<20}")
+        print(_table(
+            ['Code', 'Subtask', 'Status', 'Completed'],
+            tbl_rows, [15, 20, 11, 11],
+            title=f'Subtask Status [{key}]',
+            footer=['', f'Done: {done_sub}/{len(items)}', '', ''],
+        ))
+        print()
         total_all += len(items)
         done_all += done_sub
 
-    print(f"\nOverall: {done_all}/{total_all} subtasks done")
+    print(f"Overall: {done_all}/{total_all} subtasks done")
     return 0
 
 
@@ -1372,6 +1973,7 @@ def cmd_project_rename(args):
     wb = load_workbook(WORKLOG_FILE)
     ws_pr = wb['Projects']
     ws_kp = wb['KPIs']
+    ws_st = wb['SubTasks']
     ws_te = wb['Time Entries']
     r = found[0]['row']
     ws_pr.cell(r, 2).value = new_name
@@ -1381,13 +1983,18 @@ def cmd_project_rename(args):
         if pv and str(pv).strip().lower() == args.name.lower():
             ws_kp.cell(r2, 3).value = new_name
 
+    for r2 in range(2, ws_st.max_row + 1):
+        pv = ws_st.cell(r2, 4).value
+        if pv and str(pv).strip().lower() == args.name.lower():
+            ws_st.cell(r2, 4).value = new_name
+
     for r2 in range(2, ws_te.max_row + 1):
         pv = ws_te.cell(r2, 3).value
         if pv and str(pv).strip().lower() == args.name.lower():
             ws_te.cell(r2, 3).value = new_name
 
     wb.save(WORKLOG_FILE)
-    print(f"Renamed project '{args.name}' -> '{new_name}' (updated in Projects, KPIs, Time Entries)")
+    print(f"Renamed project '{args.name}' -> '{new_name}' (updated in Projects, KPIs, SubTasks, Time Entries)")
     gsheets.sync_project_update(args.name, 'name', new_name)
     gsheets.sync_project_rename_propagate(args.name, new_name)
     return 0

@@ -206,6 +206,46 @@ ws_kp.freeze_panes = 'A2'
 print("Sheet 2 done: KPIs")
 
 # ===================================================================
+# SHEET 3: SubTasks
+# ===================================================================
+ws_st = wb.create_sheet('SubTasks', 2)
+
+ws_st.column_dimensions['A'].width = 18
+ws_st.column_dimensions['B'].width = 25
+ws_st.column_dimensions['C'].width = 25
+ws_st.column_dimensions['D'].width = 20
+ws_st.column_dimensions['E'].width = 16
+ws_st.column_dimensions['F'].width = 15
+ws_st.column_dimensions['G'].width = 15
+ws_st.column_dimensions['H'].width = 40
+
+headers_st = ['Code', 'Sub Task', 'Father Task', 'Project',
+              'Status', 'Created Date', 'Completed Date', 'Notes']
+for i, h in enumerate(headers_st, 1):
+    ws_st.cell(row=1, column=i, value=h)
+style_header(ws_st, 1, 8)
+
+for r in range(2, MAX_DATA_ROWS + 2):
+    ws_st.cell(row=r, column=6).number_format = 'dd-mm-yyyy'
+    ws_st.cell(row=r, column=7).number_format = 'dd-mm-yyyy'
+
+dv_st_status = DataValidation(
+    type='list',
+    formula1='"In Progress,Done"',
+    allow_blank=True
+)
+dv_st_status.error = 'Please select a valid status'
+dv_st_status.errorTitle = 'Invalid Status'
+ws_st.add_data_validation(dv_st_status)
+dv_st_status.add(f'E2:E{MAX_DATA_ROWS + 1}')
+
+ws_st.cell(row=2, column=2).value = '[Enter subtask name]'
+ws_st.cell(row=2, column=2).font = Font(name='Calibri', size=11, italic=True, color='999999')
+
+ws_st.freeze_panes = 'A2'
+print("Sheet 2.5 done: SubTasks")
+
+# ===================================================================
 # SHEET 3: Weekly Summary
 # ===================================================================
 ws_ws = wb.create_sheet('Weekly Summary', 2)
@@ -580,7 +620,7 @@ print("Sheet 5 done: Monthly (WPS-compatible)")
 # ===================================================================
 # Reorder sheets
 # ===================================================================
-desired_order = ['Time Entries', 'Projects', 'KPIs', 'Weekly Summary', 'Daily Detail', 'Monthly']
+desired_order = ['Time Entries', 'Projects', 'KPIs', 'SubTasks', 'Weekly Summary', 'Daily Detail', 'Monthly']
 for i, name in enumerate(desired_order):
     idx = wb.sheetnames.index(name)
     wb.move_sheet(name, offset=i - idx)

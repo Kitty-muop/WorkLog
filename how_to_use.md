@@ -97,10 +97,31 @@ python -m tools.timer pomo --work 25 --rest 5
 
 ### Quản lý Sub Task
 
+Subtask là cấp con của Father Task. Có thể quản lý độc lập (giống KPI) hoặc tạo tự động qua timer.
+
+**Tạo tự động qua timer:** Khi `start -s "Tên"`, code tự động sinh theo format `{KPI_CODE}-ST-{N}` (vd: `PRJ-1-KPI-1-ST-1`).
+
+**Cách auto-generation:**
+1. Khi `stop`, nếu có `-s` nhưng không có `--subtask-code`
+2. Tra KPI code từ father task trong sheet KPIs
+3. Tìm số thứ tự lớn nhất → `{KPI_CODE}-ST-{max+1}`
+
+**CRUD SubTask (quản lý trên sheet SubTasks):**
 ```bash
-subtask list [-t "Father"]              # Danh sách subtask + giờ
-subtask rename -s "Cũ" -n "Mới"        # Đổi tên (tất cả entries)
-subtask delete -s "Tên"                 # Xóa tên subtask
+subtask add -s "Login" -t "API Auth"    # Thêm subtask mới
+subtask list [-t "Father"]              # Danh sách subtask + tổng giờ + father task
+subtask edit -s "Login" -p Frontend     # Sửa project/father task
+subtask edit -s "Login" -n "Auth"       # Sửa tên
+subtask rename -s "Cũ" -n "Mới"        # Đổi tên (tất cả entries + Google Sheets)
+subtask delete -s "Tên"                 # Xóa subtask khỏi SubTasks sheet
+subtask done -s "Login"                 # Đánh dấu hoàn thành
+subtask status                          # Xem tiến độ subtask (group theo father task)
+```
+
+**Subtask trong báo cáo:**
+```bash
+tasks [-t "Father"]                     # entries gom theo father task, hiện subtask
+today                                   # entries hôm nay, hiện subtask
 ```
 
 ### Xem entries theo Father Task

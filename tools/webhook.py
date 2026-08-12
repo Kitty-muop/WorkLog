@@ -5,6 +5,7 @@ Supports Slack/Discord compatible JSON format.
 """
 import os
 import json
+import datetime
 import urllib.request
 import urllib.error
 import threading
@@ -12,23 +13,62 @@ import threading
 WEBHOOK_URL = os.environ.get('WORKLOG_WEBHOOK_URL', '')
 
 
+def _build_payload(project=None, task=None, duration_h=0, description='',
+                   category='', subtask='', break_info='', start_time='', end_time=''):
+    """Build payload in Discord embed format or plain JSON."""
+    is_discord = 'discord.com/api/webhooks' in WEBHOOK_URL.lower()
+    duration_m = int(duration_h * 60)
+    duration_str = f'{int(duration_h)}h{int(duration_m % 60)}m' if duration_h >= 1 else f'{duration_m}m'
+
+    fields = []
+    if project:
+        fields.append({'name': 'Project', 'value': project, 'inline': True})
+    if task:
+        fields.append({'name': 'Father Task', 'value': task, 'inline': True})
+    if subtask:
+        fields.append({'name': 'Sub Task', 'value': subtask, 'inline': True})
+    if category:
+        fields.append({'name': 'Category', 'value': category, 'inline': True})
+    if start_time and end_time:
+        fields.append({'name': 'Time', 'value': f'{start_time} - {end_time}', 'inline': True})
+    if break_info:
+        fields.append({'name': 'Breaks', 'value': break_info, 'inline': False})
+
+    color = 0x57F287 if duration_h >= 1 else 0xFEE75C  # green / yellow
+
+    if is_discord:
+        return {
+            'embeds': [{
+                'title': 'Timer Stopped',
+                'description': description or 'No description',
+                'color': color,
+                'fields': fields,
+                'footer': {'text': f'Duration: {duration_str}'},
+                'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }]
+        }
+    else:
+        return {
+            'project': project or '',
+            'task': task or '',
+            'duration_h': round(duration_h, 2),
+            'duration_m': duration_m,
+            'description': description or '',
+            'category': category or '',
+            'subtask': subtask or '',
+            'break_info': break_info or '',
+            'start_time': start_time,
+            'end_time': end_time,
+            'source': 'worklog',
+        }
+
+
 def send(project=None, task=None, duration_h=0, description='',
          category='', subtask='', break_info='', start_time='', end_time=''):
     if not WEBHOOK_URL:
         return False
-    payload = {
-        'project': project or '',
-        'task': task or '',
-        'duration_h': round(duration_h, 2),
-        'duration_m': int(duration_h * 60),
-        'description': description or '',
-        'category': category or '',
-        'subtask': subtask or '',
-        'break_info': break_info or '',
-        'start_time': start_time,
-        'end_time': end_time,
-        'source': 'worklog',
-    }
+    payload = _build_payload(project, task, duration_h, description,
+                             category, subtask, break_info, start_time, end_time)
     threading.Thread(target=_post, args=(payload,), daemon=True).start()
     return True
 
