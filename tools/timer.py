@@ -1815,6 +1815,10 @@ def cmd_sub_edit(args):
     if args.project is not None:
         ws.cell(r, 4).value = args.project
         changed.append(f"project={args.project}")
+    if getattr(args, 'estimate', None) is not None:
+        est_val = parse_estimate(args.estimate)
+        ws.cell(r, 9).value = est_val
+        changed.append(f"estimate={est_val:.1f}h")
     if args.notes is not None:
         ws.cell(r, 8).value = args.notes
         changed.append("notes updated")
