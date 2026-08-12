@@ -879,7 +879,20 @@ def _status_emoji(status):
         return '📦'
     if s in ('pending', 'not started'):
         return '⏳'
-    return '⚪'
+def check_reminder_dedup(sent_dict, user_id, date_str, window_key):
+    """Return True if reminder has not been sent yet for this user, date, and window."""
+    u_sent = sent_dict.get(str(user_id), {})
+    key = f"{date_str}_{window_key}"
+    return not u_sent.get(key, False)
+
+
+def mark_reminder_sent(sent_dict, user_id, date_str, window_key):
+    """Mark reminder as sent for this user, date, and window."""
+    u_key = str(user_id)
+    if u_key not in sent_dict:
+        sent_dict[u_key] = {}
+    key = f"{date_str}_{window_key}"
+    sent_dict[u_key][key] = True
 
 
 async def _ac_cat(interaction: discord.Interaction, current: str):

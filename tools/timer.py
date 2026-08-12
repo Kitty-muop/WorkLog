@@ -90,6 +90,28 @@ def get_elapsed(timer):
     return acc
 
 
+def parse_estimate(val, default=7.5):
+    """Parse estimate string or float to float, defaulting to 7.5."""
+    if val is None:
+        return default
+    try:
+        res = float(val)
+        return res if res > 0 else default
+    except (ValueError, TypeError):
+        return default
+
+
+def sum_actual_hours(entries, task_name):
+    """Sum actual logged duration for a given task/subtask name."""
+    if not task_name:
+        return 0.0
+    t_name = str(task_name).strip().lower()
+    return round(sum(
+        float(e.get('duration', 0.0)) for e in entries if isinstance(e, dict)
+        and (str(e.get('task', '') or e.get('subtask', '')).strip().lower() == t_name)
+    ), 2)
+
+
 def find_timer(state, project=None, task=None, subtask=None, paused=None, timer_id=None, user_id=None):
     """Find matching timer strictly by user_id. Returns most recent match or None."""
     timers = state.get('timers', [])
