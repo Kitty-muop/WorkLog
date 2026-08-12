@@ -16,6 +16,7 @@ from discord.ext import commands, tasks as ext_tasks
 sys.path.insert(0, os.path.dirname(__file__))
 import timer as tm
 import gamify as gm
+import gen_dashboard
 
 # Load .env from project root
 env_path = Path(__file__).resolve().parent.parent / '.env'
