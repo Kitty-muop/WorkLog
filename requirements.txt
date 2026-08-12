@@ -1,0 +1,7 @@
+cocoindex>=1.0.19
+openpyxl>=3.1.5
+pandas>=3.0.5
+discord.py>=2.7.1
+python-dotenv>=1.2.2
+gspread>=6.2.1
+google-auth>=2.56.2

@@ -18,5 +18,10 @@ tools/bot.pid
 bot_run.log*
 bot_test*.log
 
+# Tool Caches & Artifacts
+graphify-out/
+.opencode/
+opencode.json
+
 # Backups
 *.bak
