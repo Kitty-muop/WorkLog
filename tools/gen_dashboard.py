@@ -225,43 +225,45 @@ def generate_html():
 
 
 def deploy_dashboard():
-    """Generate index.html and push to gh-pages branch on GitHub."""
+    """Generate index.html and push to gh-pages branch on GitHub via isolated worktree."""
     generate_html()
 
     cwd = str(PROJECT_ROOT)
+    tmp_dir = PROJECT_ROOT / ".gh_pages_build"
 
-    # Use git commands to update gh-pages branch
     try:
-        # Check if gh-pages branch exists locally or remotely
-        res = subprocess.run(["git", "rev-parse", "--verify", "gh-pages"], capture_output=True, cwd=cwd)
-        branch_exists = res.returncode == 0
+        # Fetch gh-pages branch from remote if available
+        subprocess.run(["git", "fetch", "origin", "gh-pages"], capture_output=True, cwd=cwd)
 
-        # Store current branch name
-        curr_branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, cwd=cwd).stdout.strip()
+        # Remove stale worktree if exists
+        if tmp_dir.exists():
+            subprocess.run(["git", "worktree", "remove", "-f", str(tmp_dir)], capture_output=True, cwd=cwd)
 
-        if not branch_exists:
-            subprocess.run(["git", "checkout", "--orphan", "gh-pages"], check=True, cwd=cwd)
-            subprocess.run(["git", "rm", "-rf", "."], check=True, cwd=cwd)
-        else:
-            subprocess.run(["git", "checkout", "gh-pages"], check=True, cwd=cwd)
+        # Create isolated worktree for gh-pages branch
+        res = subprocess.run(["git", "worktree", "add", "-B", "gh-pages", str(tmp_dir)], capture_output=True, cwd=cwd)
+        if res.returncode != 0:
+            # Create orphan worktree if gh-pages branch does not exist yet
+            subprocess.run(["git", "worktree", "add", "--detach", str(tmp_dir)], check=True, cwd=cwd)
+            subprocess.run(["git", "checkout", "--orphan", "gh-pages"], capture_output=True, cwd=str(tmp_dir))
+            subprocess.run(["git", "rm", "-rf", "."], capture_output=True, cwd=str(tmp_dir))
 
-        # Copy generated index.html to repo root for GitHub Pages
-        root_index = PROJECT_ROOT / "index.html"
-        root_index.write_text(OUTPUT_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+        # Copy generated index.html into the isolated worktree
+        (tmp_dir / "index.html").write_text(OUTPUT_PATH.read_text(encoding="utf-8"), encoding="utf-8")
 
-        subprocess.run(["git", "add", "index.html"], check=True, cwd=cwd)
-        subprocess.run(["git", "commit", "-m", f"chore: update dashboard static site ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})"], capture_output=True, cwd=cwd)
-        subprocess.run(["git", "push", "origin", "gh-pages", "--force"], check=True, cwd=cwd)
+        # Commit and push from the isolated worktree directory
+        subprocess.run(["git", "add", "index.html"], check=True, cwd=str(tmp_dir))
+        subprocess.run(["git", "commit", "-m", f"chore: update dashboard static site ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})"], capture_output=True, cwd=str(tmp_dir))
+        subprocess.run(["git", "push", "origin", "gh-pages", "--force"], check=True, cwd=str(tmp_dir))
 
-        # Switch back to original branch
-        subprocess.run(["git", "checkout", curr_branch], check=True, cwd=cwd)
+        # Remove isolated worktree
+        subprocess.run(["git", "worktree", "remove", "-f", str(tmp_dir)], capture_output=True, cwd=cwd)
 
         print(f"[DASHBOARD] Deployed successfully to GitHub Pages: {GITHUB_PAGES_URL}")
         return True, GITHUB_PAGES_URL
     except Exception as e:
         print(f"[DASHBOARD] Deploy error: {e}")
-        # Make sure we return to original branch if failed
-        subprocess.run(["git", "checkout", "master"], capture_output=True, cwd=cwd)
+        if tmp_dir.exists():
+            subprocess.run(["git", "worktree", "remove", "-f", str(tmp_dir)], capture_output=True, cwd=cwd)
         return False, str(e)
 
 
