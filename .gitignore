@@ -1,0 +1,22 @@
+# CocoIndex Code (ccc)
+/.cocoindex_code/
+
+# Virtual Environment & Python Bytecode
+.venv/
+__pycache__/
+*.pyc
+
+# Environment & Secrets
+.env
+service-account-key.json
+
+# Process PIDs and Logs
+*.pid
+*.log
+*.log.*
+tools/bot.pid
+bot_run.log*
+bot_test*.log
+
+# Backups
+*.bak
