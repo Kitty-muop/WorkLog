@@ -37,6 +37,7 @@ def generate_level_thresholds():
     return thresholds
 
 SCORE_THRESHOLDS = generate_level_thresholds()
+LEVEL_NAMES = ["Novice", "Adventurer", "Expert", "Master", "Grandmaster Legend"]
 
 def get_tier_name(level):
     """Map Level (0..100) to 5 Major Level Milestones."""

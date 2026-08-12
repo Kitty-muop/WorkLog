@@ -193,8 +193,7 @@ def make_progress_bar(pct: float, length: int = 10) -> str:
 
 def make_game_exp_bar(score: int) -> tuple[str, str, int, int]:
     """Calculate level, level name, progress bar, current exp, and next level exp."""
-    thresholds = gm.SCORE_THRESHOLDS if gm else [0, 10, 25, 50, 100, 200, 350, 500]
-    names = gm.LEVEL_NAMES if gm else ["Rookie", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Master", "Grandmaster"]
+    thresholds = gm.SCORE_THRESHOLDS if (gm and hasattr(gm, 'SCORE_THRESHOLDS')) else [0, 10, 25, 50, 100, 200, 350, 500]
 
     lvl = 0
     for i, t in reversed(list(enumerate(thresholds))):
