@@ -102,13 +102,7 @@ def save_gamify_data(data):
     SCORE_FILE.write_text(json.dumps(data, indent=2, default=str))
 
 def get_dur(val):
-    if val is None:
-        return 0.0
-    if isinstance(val, (int, float)):
-        return float(val)
-    if hasattr(val, 'hour'):
-        return 0.0
-    return 0.0
+    return float(val) if isinstance(val, (int, float)) else 0.0
 
 
 def get_time_entries(ws):

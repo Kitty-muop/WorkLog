@@ -24,17 +24,12 @@ def _cell_to_str(val):
     """Convert an Excel cell value to a clean string for Google Sheets."""
     if val is None:
         return ''
-    if isinstance(val, datetime.datetime):
-        # If time component is midnight, it's a date-only value
-        if val.hour == 0 and val.minute == 0 and val.second == 0:
+    if isinstance(val, (datetime.datetime, datetime.date)):
+        if getattr(val, 'hour', 0) == 0 and getattr(val, 'minute', 0) == 0 and getattr(val, 'second', 0) == 0:
             return val.strftime('%Y-%m-%d')
         return val.strftime('%Y-%m-%d %H:%M:%S')
-    if isinstance(val, datetime.date):
-        return val.strftime('%Y-%m-%d')
     if isinstance(val, datetime.time):
-        if val.second:
-            return val.strftime('%H:%M:%S')
-        return val.strftime('%H:%M')
+        return val.strftime('%H:%M:%S') if val.second else val.strftime('%H:%M')
     if isinstance(val, (int, float)):
         return str(val)
     return str(val).strip()
