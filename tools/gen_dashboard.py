@@ -25,12 +25,76 @@ OUTPUT_PATH = PROJECT_ROOT / "dashboard" / "index.html"
 GITHUB_PAGES_URL = "https://kitty-muop.github.io/WorkLog/"
 
 
-def _cell_to_str(val):
+def _safe_float(val, default=0.0):
+    """Safely convert value to float with fallback."""
     if val is None:
-        return ""
-    if isinstance(val, (datetime.datetime, datetime.date)):
-        return val.strftime("%Y-%m-%d")
-    return str(val).strip()
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _build_project_tree(wb, sub_actual_map):
+    """Build hierarchical project -> KPI -> SubTask tree."""
+    ws_p = wb["Projects"]
+    ws_k = wb["KPIs"]
+    ws_st = wb["SubTasks"]
+
+    kpis_by_proj = {}
+    for r in range(2, ws_k.max_row + 1):
+        k_code = ws_k.cell(r, 1).value
+        k_name = ws_k.cell(r, 2).value
+        p_name = ws_k.cell(r, 3).value
+        status = ws_k.cell(r, 7).value
+        if k_name and p_name:
+            kpis_by_proj.setdefault(str(p_name).strip(), []).append({
+                "code": str(k_code or ""),
+                "name": str(k_name).strip(),
+                "status": str(status or "In Progress")
+            })
+
+    sub_by_kpi = {}
+    for r in range(2, ws_st.max_row + 1):
+        st_code = ws_st.cell(r, 1).value
+        st_name = ws_st.cell(r, 2).value
+        ft_name = ws_st.cell(r, 3).value
+        status = ws_st.cell(r, 5).value
+        est_val = ws_st.cell(r, 9).value
+        if st_name and ft_name:
+            st_str = str(st_name).strip()
+            act_h = sub_actual_map.get(st_str, 0.0)
+            est_h = _safe_float(est_val, default=7.5)
+
+            sub_by_kpi.setdefault(str(ft_name).strip(), []).append({
+                "code": str(st_code or ""),
+                "name": st_str,
+                "status": str(status or "In Progress"),
+                "actual_h": act_h,
+                "estimate_h": est_h
+            })
+
+    projects_tree = []
+    for r in range(2, ws_p.max_row + 1):
+        p_code = ws_p.cell(r, 1).value
+        p_name = ws_p.cell(r, 2).value
+        status = ws_p.cell(r, 4).value
+        if not p_name:
+            continue
+        p_str = str(p_name).strip()
+
+        proj_kpis = kpis_by_proj.get(p_str, [])
+        for k in proj_kpis:
+            k["subtasks"] = sub_by_kpi.get(k["name"], [])
+
+        projects_tree.append({
+            "code": str(p_code or ""),
+            "name": p_str,
+            "status": str(status or "In Progress"),
+            "kpis": proj_kpis
+        })
+
+    return projects_tree
 
 
 def extract_dashboard_data():
@@ -56,7 +120,7 @@ def extract_dashboard_data():
         "today_score": g_res.get("today_score", 0),
     }
 
-    # 2. Daily Hours (Last 14 Days)
+    # 2. Daily Hours (Last 14 Days) & Category Distribution
     ws_te = wb["Time Entries"]
     daily_map = {}
     cat_map = {}
@@ -64,21 +128,12 @@ def extract_dashboard_data():
 
     for r in range(2, ws_te.max_row + 1):
         d_val = ws_te.cell(r, 1).value
-        p_val = ws_te.cell(r, 3).value
-        t_val = ws_te.cell(r, 4).value
         st_val = ws_te.cell(r, 5).value
         cat_val = ws_te.cell(r, 7).value
         dur_val = ws_te.cell(r, 10).value
 
-        if not d_val or dur_val is None:
-            continue
-
-        try:
-            dur = float(dur_val)
-        except (ValueError, TypeError):
-            dur = 0.0
-
-        if dur <= 0:
+        dur = _safe_float(dur_val, default=0.0)
+        if not d_val or dur <= 0:
             continue
 
         d_str = _cell_to_str(d_val)
@@ -117,85 +172,30 @@ def extract_dashboard_data():
         if not st_name or str(st_name).startswith("[Enter"):
             continue
         st_str = str(st_name).strip()
-        est_val = ws_st.cell(r, 9).value
-        try:
-            est_h = float(est_val) if est_val else 7.5
-        except (ValueError, TypeError):
-            est_h = 7.5
-
+        est_h = _safe_float(ws_st.cell(r, 9).value, default=7.5)
         act_h = sub_actual_map.get(st_str, 0.0)
-        
-        # Take subtasks that have some actual work or non-default estimates
+
         est_act_labels.append(st_str[:25] + ("..." if len(st_str) > 25 else ""))
         estimates.append(est_h)
         actuals.append(act_h)
 
-    # Limit to top/last 10 subtasks for clean line chart rendering
     estimate_vs_actual = {
         "labels": est_act_labels[-10:],
         "estimates": estimates[-10:],
         "actuals": actuals[-10:]
     }
 
-    # 5. Project -> KPI -> SubTask Progress Tree
-    projects_tree = []
-    ws_p = wb["Projects"]
-    ws_k = wb["KPIs"]
+    # 5. Project Tree
+    projects_tree = _build_project_tree(wb, sub_actual_map)
 
-    kpis_by_proj = {}
-    for r in range(2, ws_k.max_row + 1):
-        k_code = ws_k.cell(r, 1).value
-        k_name = ws_k.cell(r, 2).value
-        p_name = ws_k.cell(r, 3).value
-        status = ws_k.cell(r, 7).value
-        if k_name and p_name:
-            kpis_by_proj.setdefault(str(p_name).strip(), []).append({
-                "code": str(k_code or ""),
-                "name": str(k_name).strip(),
-                "status": str(status or "In Progress")
-            })
-
-    sub_by_kpi = {}
-    for r in range(2, ws_st.max_row + 1):
-        st_code = ws_st.cell(r, 1).value
-        st_name = ws_st.cell(r, 2).value
-        ft_name = ws_st.cell(r, 3).value
-        status = ws_st.cell(r, 5).value
-        est_val = ws_st.cell(r, 9).value
-        if st_name and ft_name:
-            st_str = str(st_name).strip()
-            act_h = sub_actual_map.get(st_str, 0.0)
-            try:
-                est_h = float(est_val) if est_val else 7.5
-            except (ValueError, TypeError):
-                est_h = 7.5
-
-            sub_by_kpi.setdefault(str(ft_name).strip(), []).append({
-                "code": str(st_code or ""),
-                "name": st_str,
-                "status": str(status or "In Progress"),
-                "actual_h": act_h,
-                "estimate_h": est_h
-            })
-
-    for r in range(2, ws_p.max_row + 1):
-        p_code = ws_p.cell(r, 1).value
-        p_name = ws_p.cell(r, 2).value
-        status = ws_p.cell(r, 4).value
-        if not p_name:
-            continue
-        p_str = str(p_name).strip()
-        
-        proj_kpis = kpis_by_proj.get(p_str, [])
-        for k in proj_kpis:
-            k["subtasks"] = sub_by_kpi.get(k["name"], [])
-
-        projects_tree.append({
-            "code": str(p_code or ""),
-            "name": p_str,
-            "status": str(status or "In Progress"),
-            "kpis": proj_kpis
-        })
+    return {
+        "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ICT"),
+        "rpg_stats": rpg_stats,
+        "daily_hours": daily_hours,
+        "categories": categories,
+        "estimate_vs_actual": estimate_vs_actual,
+        "projects_tree": projects_tree
+    }
 
     return {
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ICT"),
