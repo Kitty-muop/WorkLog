@@ -24,6 +24,10 @@ def _cell_to_str(val):
     """Convert an Excel cell value to a clean string for Google Sheets."""
     if val is None:
         return ''
+    s_val = str(val).strip()
+    # Sanitize Excel formula errors (#N/A, #VALUE!, #REF!, #DIV/0!)
+    if s_val.startswith('#') and any(err in s_val for err in ('N/A', 'VALUE!', 'REF!', 'DIV/0!', 'NAME?', 'NUM!', 'NULL!')):
+        return ''
     if isinstance(val, (datetime.datetime, datetime.date)):
         if getattr(val, 'hour', 0) == 0 and getattr(val, 'minute', 0) == 0 and getattr(val, 'second', 0) == 0:
             return val.strftime('%Y-%m-%d')
@@ -32,7 +36,7 @@ def _cell_to_str(val):
         return val.strftime('%H:%M:%S') if val.second else val.strftime('%H:%M')
     if isinstance(val, (int, float)):
         return str(val)
-    return str(val).strip()
+    return s_val
 
 
 def _read_sheet(wb, sheet_name, max_cols):
@@ -79,7 +83,7 @@ def full_sync():
     sheets = [
         ('Projects', 5),
         ('KPIs', 9),
-        ('SubTasks', 8),
+        ('SubTasks', 9),
         ('Time Entries', 12),
     ]
 
