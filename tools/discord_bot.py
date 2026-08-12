@@ -915,10 +915,10 @@ _ac_all_sub = _ac_sub
 
 # ════════════════════════  Timer  ════════════════════════
 
-@bot.tree.command(name="start", description="Start timer")
-@app_commands.describe(project="Project name (auto: git folder)", task="Father task (auto: git branch)", subtask="Sub task", category="Work Category", estimate="Estimated hours (e.g. 3.5, default: 7.5)")
+@bot.tree.command(name="start", description="Start timer (All parameters are mandatory)")
+@app_commands.describe(project="[REQUIRED] Project name", task="[REQUIRED] Father task name", subtask="[REQUIRED] Subtask name", category="[REQUIRED] Work category", estimate="[REQUIRED] Estimated hours (e.g. 3.5)")
 @app_commands.autocomplete(project=_ac_all_proj, task=_ac_all_task, subtask=_ac_all_sub, category=_ac_cat)
-async def start(interaction: discord.Interaction, project: str = None, task: str = None, subtask: str = None, category: str = None, estimate: str = None):
+async def start(interaction: discord.Interaction, project: str, task: str, subtask: str, category: str, estimate: str):
     deferred = await _defer(interaction, ephemeral=True)
     u_id = str(interaction.user.id)
     u_name = interaction.user.display_name
@@ -1330,10 +1330,10 @@ async def sub_list(interaction: discord.Interaction, task: str = None):
     await _send_embed(interaction, embed, out, deferred, "subtask_list.md")
 
 
-@subtask.command(name="add", description="Add a new subtask")
-@app_commands.describe(name="Subtask name", father_task="Father task name", project="Project name", estimate="Estimated hours (e.g. 3.5, default: 7.5)")
+@subtask.command(name="add", description="Add a new subtask (All parameters are mandatory)")
+@app_commands.describe(name="[REQUIRED] Subtask name", father_task="[REQUIRED] Father task name", project="[REQUIRED] Project name", estimate="[REQUIRED] Estimated hours (e.g. 3.5)")
 @app_commands.autocomplete(father_task=_ac_all_task, project=_ac_all_proj)
-async def sub_add(interaction: discord.Interaction, name: str, father_task: str, project: str = None, estimate: str = None):
+async def sub_add(interaction: discord.Interaction, name: str, father_task: str, project: str, estimate: str):
     deferred = await _defer(interaction)
     out, ret = _run(tm.cmd_sub_add, subtask=name, task=father_task, project=project, estimate=estimate)
     clear_bot_cache()
@@ -1427,10 +1427,10 @@ async def sub_status(interaction: discord.Interaction):
     await _send_embed(interaction, embed, out, deferred, "subtask_status.md")
 
 
-@subtask.command(name="start", description="Start timer for an existing subtask")
-@app_commands.describe(name="Subtask name or code", project="Project override", task="Father task override", category="Category override", description="Description override", estimate="Estimated hours (e.g. 3.5, default: 7.5)")
-@app_commands.autocomplete(name=_ac_all_sub, project=_ac_all_proj, task=_ac_all_task)
-async def sub_start(interaction: discord.Interaction, name: str, project: str = None, task: str = None, category: str = None, description: str = None, estimate: str = None):
+@subtask.command(name="start", description="Start timer for a subtask (All parameters are mandatory)")
+@app_commands.describe(name="[REQUIRED] Subtask name or code", project="[REQUIRED] Project name", task="[REQUIRED] Father task name", category="[REQUIRED] Category", description="Description", estimate="[REQUIRED] Estimated hours (e.g. 3.5)")
+@app_commands.autocomplete(name=_ac_all_sub, project=_ac_all_proj, task=_ac_all_task, category=_ac_cat)
+async def sub_start(interaction: discord.Interaction, name: str, project: str, task: str, category: str, estimate: str, description: str = None):
     deferred = await _defer(interaction)
     u_id = str(interaction.user.id)
     u_name = interaction.user.display_name

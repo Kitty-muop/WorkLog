@@ -463,6 +463,17 @@ def cmd_start(args):
     subtask_code = getattr(args, 'subtask_code', None)
     user_id = getattr(args, 'user_id', None)
     user_name = getattr(args, 'user_name', None)
+
+    # Validate mandatory parameters
+    project_input = getattr(args, 'project', None) or detect_project()
+    task_input = getattr(args, 'task', None) or detect_branch()
+    category_input = getattr(args, 'category', None)
+    estimate_input = getattr(args, 'estimate', None)
+
+    if not project_input or not task_input or not subtask_name or not category_input or not estimate_input:
+        print("Error: Missing mandatory parameters for start command. All of [project, task, subtask, category, estimate] are required.")
+        return 1
+
     if subtask_name:
         subtasks = get_subtasks()
         match = None
@@ -1743,6 +1754,12 @@ def cmd_sub_add(args):
         return 1
     if not args.task:
         print("Error: -t FATHER_TASK is required")
+        return 1
+    if not getattr(args, 'project', None):
+        print("Error: -p PROJECT is required")
+        return 1
+    if not getattr(args, 'estimate', None):
+        print("Error: -e ESTIMATE is required")
         return 1
 
     # Check if already exists
