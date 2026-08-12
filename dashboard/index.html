@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkLog — RPG Performance Dashboard</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f172a',
+                        cardBg: '#1e293b',
+                        borderBg: '#334155',
+                        brandPrimary: '#3b82f6',
+                        brandSuccess: '#10b981',
+                        brandWarning: '#f59e0b',
+                        brandDanger: '#ef4444',
+                        brandPurple: '#8b5cf6'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen font-sans leading-normal tracking-normal p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- HEADER -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between bg-cardBg border border-borderBg rounded-2xl p-6 shadow-xl">
+            <div class="space-y-1">
+                <div class="flex items-center space-x-3">
+                    <span class="text-3xl">🏰</span>
+                    <h1 class="text-2xl font-bold tracking-tight text-white">WorkLog RPG Performance Dashboard</h1>
+                </div>
+                <p class="text-sm text-slate-400">Real-time productivity, quest tracking, and time performance analytics</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex items-center space-x-2 text-xs text-slate-400 bg-slate-800/80 border border-borderBg px-4 py-2 rounded-xl">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Last Updated: <strong id="generated-at" class="text-slate-200">--</strong></span>
+            </div>
+        </header>
+
+        <!-- SECTION 3: RPG STATS CARDS -->
+        <section id="rpg-stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Hero Rank & Level -->
+            <div class="bg-cardBg border border-borderBg rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    <span>🛡️ Hero Rank & Level</span>
+                    <span id="stat-level-num" class="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md font-bold text-xs">Lv.0</span>
+                </div>
+                <div class="my-3">
+                    <div id="stat-hero-rank" class="text-2xl font-extrabold text-white">Novice</div>
+                    <div class="text-xs text-slate-400 mt-1"><span id="stat-total-exp">0</span> EXP Total</div>
+                </div>
+                <!-- EXP Progress Bar -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-xs text-slate-400 font-medium">
+                        <span>Level Progress</span>
+                        <span id="stat-exp-pct">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-slate-700">
+                        <div id="stat-exp-bar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Streak -->
+            <div class="bg-cardBg border border-borderBg rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    <span>🔥 Daily Streak</span>
+                    <span class="text-amber-400 text-base">⚡</span>
+                </div>
+                <div class="my-3">
+                    <div class="text-3xl font-extrabold text-amber-400"><span id="stat-streak">0</span> <span class="text-lg font-semibold text-slate-300">Days</span></div>
+                    <div class="text-xs text-slate-400 mt-1">Best Record: <span id="stat-max-streak" class="text-slate-200 font-semibold">0</span> Days</div>
+                </div>
+                <div class="text-xs text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
+                    Keep logging daily to maintain streak bonus!
+                </div>
+            </div>
+
+            <!-- Consistency Rate -->
+            <div class="bg-cardBg border border-borderBg rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    <span>🎯 Consistency Rate</span>
+                    <span class="text-emerald-400 text-base">📈</span>
+                </div>
+                <div class="my-3">
+                    <div id="stat-consistency" class="text-3xl font-extrabold text-emerald-400">0.0%</div>
+                    <div class="text-xs text-slate-400 mt-1">Weekday worklog coverage</div>
+                </div>
+                <div class="text-xs text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
+                    Target: ≥ 90% weekday logging
+                </div>
+            </div>
+
+            <!-- Today's Score -->
+            <div class="bg-cardBg border border-borderBg rounded-2xl p-5 shadow-lg flex flex-col justify-between">
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    <span>⚡ Today's EXP Score</span>
+                    <span class="text-purple-400 text-base">✨</span>
+                </div>
+                <div class="my-3">
+                    <div class="text-3xl font-extrabold text-purple-400">+<span id="stat-today-score">0</span> <span class="text-lg font-semibold text-slate-300">EXP</span></div>
+                    <div class="text-xs text-slate-400 mt-1">Earned from today's work entries</div>
+                </div>
+                <div class="text-xs text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50">
+                    Based on 7.5h target + category bonus
+                </div>
+            </div>
+        </section>
+
+        <!-- CHARTS GRID: SECTION 1 & SECTION 2 -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- SECTION 1: DAILY HOURS BAR CHART (2 cols) -->
+            <div class="lg:col-span-2 bg-cardBg border border-borderBg rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <span>📊</span> Daily Work Hours (Last 14 Days)
+                        </h2>
+                        <p class="text-xs text-slate-400">Logged actual hours vs 7.5h daily target threshold</p>
+                    </div>
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">Target: 7.5h/day</span>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="dailyHoursChart"></canvas>
+                </div>
+            </div>
+
+            <!-- SECTION 2: CATEGORY DISTRIBUTION DOUGHNUT CHART (1 col) -->
+            <div class="bg-cardBg border border-borderBg rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div class="mb-4">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <span>🍩</span> Category Distribution
+                    </h2>
+                    <p class="text-xs text-slate-400">Time allocation across work categories</p>
+                </div>
+                <div class="relative h-64 w-full flex items-center justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: ESTIMATE VS ACTUAL TREND (LINE CHART) -->
+        <section class="bg-cardBg border border-borderBg rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <span>📈</span> Estimate vs Actual Hours Trend
+                    </h2>
+                    <p class="text-xs text-slate-400">Comparing estimated duration against actual logged work hours per subtask</p>
+                </div>
+            </div>
+            <div class="relative h-72 w-full">
+                <canvas id="estVsActChart"></canvas>
+            </div>
+        </section>
+
+        <!-- SECTION 5: PROJECT PROGRESS TREE TABLE -->
+        <section class="bg-cardBg border border-borderBg rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <span>📋</span> Quest Progress Matrix (Project → KPI → SubTask)
+                    </h2>
+                    <p class="text-xs text-slate-400">Hierarchical task breakdown with completion statuses and logged hours</p>
+                </div>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-borderBg">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-800/80 text-xs font-semibold uppercase text-slate-400 border-b border-borderBg">
+                        <tr>
+                            <th class="py-3.5 px-4">Item Name / Code</th>
+                            <th class="py-3.5 px-4">Type</th>
+                            <th class="py-3.5 px-4">Status</th>
+                            <th class="py-3.5 px-4 text-right">Actual Hours</th>
+                            <th class="py-3.5 px-4 text-right">Estimate Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody id="project-tree-body" class="divide-y divide-borderBg bg-cardBg">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-800">
+            WorkLog RPG Engine v2.0 &bull; Automated Static Dashboard &bull; Powered by TailwindCSS & Chart.js
+        </footer>
+
+    </div>
+
+    <!-- EMBEDDED DATA & SCRIPT -->
+    <script>
+        const DATA = {
+  "generated_at": "2026-08-12 16:53:53 ICT",
+  "rpg_stats": {
+    "hero_rank": "Novice",
+    "level": 15,
+    "total_exp": 790,
+    "current_threshold": 750,
+    "next_threshold": 800,
+    "streak": 0,
+    "max_streak": 0,
+    "consistency_pct": 0.0,
+    "today_score": 0
+  },
+  "daily_hours": {
+    "labels": [],
+    "values": [],
+    "target": 7.5
+  },
+  "categories": {
+    "labels": [],
+    "values": []
+  },
+  "estimate_vs_actual": {
+    "labels": [
+      "sync with the server",
+      "change the MCP code base",
+      "finish admin function: [c...",
+      "Clear main branch to push...",
+      "Check the MCP call",
+      "Fix CRUD trong Production",
+      "Update report bug analyti...",
+      "Update the n8n running",
+      "Fix deploy local",
+      "Check the doc and structu..."
+    ],
+    "estimates": [
+      7.5,
+      7.5,
+      7.5,
+      7.5,
+      7.5,
+      7.5,
+      7.5,
+      7.5,
+      7.5,
+      3.0
+    ],
+    "actuals": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "projects_tree": [
+    {
+      "code": "PRJ-1",
+      "name": "AI-AutoTest",
+      "status": "Archived",
+      "kpis": [
+        {
+          "code": "PRJ-1-KPI-1",
+          "name": "Create MCP tool",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-1-KPI-1-ST-1",
+              "name": "MCP log",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-1-ST-2",
+              "name": "MCP call api",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-1-ST-3",
+              "name": "MCP running test case",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-1-ST-4",
+              "name": "fix MCP log and MCP game control",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-1-ST-5",
+              "name": "Fix MCP tool airtest",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-1-ST-6",
+              "name": "Create MCP Airtest report",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        },
+        {
+          "code": "PRJ-1-KPI-2",
+          "name": "Prompt AI",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-1-KPI-2-ST-1",
+              "name": "Convert knowledge AI",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-2-ST-2",
+              "name": "improve prompt",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-2-ST-3",
+              "name": "Fix the memory AI",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-2-ST-4",
+              "name": "coding MCP tree and file base",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-1-KPI-2-ST-5",
+              "name": "change the MCP code base",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PRJ-2",
+      "name": "Test",
+      "status": "Archived",
+      "kpis": [
+        {
+          "code": "PRJ-2-KPI-1",
+          "name": "Test Feature",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-2-KPI-1-ST-1",
+              "name": "Subtask 1",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-2-KPI-1-ST-2",
+              "name": "Subtask 2",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PRJ-3",
+      "name": "web fix",
+      "status": "Archived",
+      "kpis": [
+        {
+          "code": "PRJ-3-KPI-1",
+          "name": "Fix the error api not loadding",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-3-KPI-1-ST-1",
+              "name": "Improve core code",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        },
+        {
+          "code": "PRJ-3-KPI-2",
+          "name": "Fix the project web running correct",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-3-KPI-2-ST-1",
+              "name": "Running checker the UI/UX",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-3-KPI-2-ST-2",
+              "name": "update the authenticate",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-3-KPI-2-ST-3",
+              "name": "Add tab analystic in dashboard",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-3-KPI-2-ST-4",
+              "name": "sync with the server",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-3-KPI-2-ST-5",
+              "name": "finish admin function: [chapter, tag, slug, author]",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        },
+        {
+          "code": "PRJ-3-KPI-3",
+          "name": "Convert file and folder to NextJS",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-3-KPI-3-ST-1",
+              "name": "Convert the dashboard admin",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-3-KPI-3-ST-2",
+              "name": "update the dashboard",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-3-KPI-3-ST-3",
+              "name": "debug client",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PRJ-4",
+      "name": "AI-Airtest",
+      "status": "Archived",
+      "kpis": [
+        {
+          "code": "PRJ-4-KPI-1",
+          "name": "MCP-tool",
+          "status": "Done",
+          "subtasks": []
+        }
+      ]
+    },
+    {
+      "code": "PRJ-5",
+      "name": "Comic web",
+      "status": "Active",
+      "kpis": [
+        {
+          "code": "PRJ-5-KPI-1",
+          "name": "Push to production with function CRUD for chapter, author, comic, category, login oauth",
+          "status": "Done",
+          "subtasks": [
+            {
+              "code": "PRJ-5-KPI-1-ST-1",
+              "name": "Clear main branch to push production",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-5-KPI-1-ST-2",
+              "name": "Fix CRUD trong Production",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        },
+        {
+          "code": "PRJ-5-KPI-2",
+          "name": "Admin dashboard update",
+          "status": "In Progress",
+          "subtasks": [
+            {
+              "code": "PRJ-5-KPI-2-ST-1",
+              "name": "Update report bug analytics Sentry",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-5-KPI-2-ST-2",
+              "name": "Fix deploy local",
+              "status": "In Progress",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PRJ-6",
+      "name": "AI-test",
+      "status": "Active",
+      "kpis": [
+        {
+          "code": "PRJ-6-KPI-1",
+          "name": "MCP base finish",
+          "status": "In Progress",
+          "subtasks": [
+            {
+              "code": "PRJ-6-KPI-1-ST-1",
+              "name": "Check the MCP call",
+              "status": "Done",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            },
+            {
+              "code": "PRJ-6-KPI-1-ST-2",
+              "name": "Update the n8n running",
+              "status": "Hung",
+              "actual_h": 0.0,
+              "estimate_h": 7.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "PRJ-7",
+      "name": "Cocos learning",
+      "status": "Active",
+      "kpis": [
+        {
+          "code": "PRJ-7-KPI-1",
+          "name": "Install and first step cocos engine",
+          "status": "In Progress",
+          "subtasks": [
+            {
+              "code": "PRJ-7-KPI-1-ST-1",
+              "name": "Check the doc and structure of cocos engine",
+              "status": "In Progress",
+              "actual_h": 0.0,
+              "estimate_h": 3.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Render Generated Timestamp
+            document.getElementById('generated-at').textContent = DATA.generated_at || 'N/A';
+
+            // Render RPG Stats Cards
+            const rpg = DATA.rpg_stats || {};
+            document.getElementById('stat-hero-rank').textContent = rpg.hero_rank || 'Novice';
+            document.getElementById('stat-level-num').textContent = `Lv.${rpg.level || 0}`;
+            document.getElementById('stat-total-exp').textContent = (rpg.total_exp || 0).toLocaleString();
+            document.getElementById('stat-streak').textContent = rpg.streak || 0;
+            document.getElementById('stat-max-streak').textContent = rpg.max_streak || 0;
+            document.getElementById('stat-consistency').textContent = `${rpg.consistency_pct || 0}%`;
+            document.getElementById('stat-today-score').textContent = rpg.today_score || 0;
+
+            const curT = rpg.current_threshold || 0;
+            const nextT = rpg.next_threshold || 100;
+            const curExp = rpg.total_exp || 0;
+            const range = Math.max(1, nextT - curT);
+            const expInLvl = Math.max(0, curExp - curT);
+            const pct = Math.min(100, Math.round((expInLvl / range) * 100));
+
+            document.getElementById('stat-exp-pct').textContent = `${pct}%`;
+            document.getElementById('stat-exp-bar').style.width = `${pct}%`;
+
+            // Chart Colors
+            const colorPrimary = '#3b82f6';
+            const colorSuccess = '#10b981';
+            const colorWarning = '#f59e0b';
+            const colorPurple = '#8b5cf6';
+            const colorGrid = '#334155';
+
+            // 1. SECTION 1: Daily Hours Bar Chart
+            const daily = DATA.daily_hours || { labels: [], values: [], target: 7.5 };
+            const barColors = daily.values.map(v => v >= 7.5 ? colorSuccess : colorWarning);
+
+            new Chart(document.getElementById('dailyHoursChart'), {
+                type: 'bar',
+                data: {
+                    labels: daily.labels,
+                    datasets: [
+                        {
+                            label: 'Logged Actual Hours',
+                            data: daily.values,
+                            backgroundColor: barColors,
+                            borderRadius: 6,
+                        },
+                        {
+                            label: 'Target Threshold (7.5h)',
+                            data: Array(daily.labels.length).fill(7.5),
+                            type: 'line',
+                            borderColor: '#ef4444',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: colorGrid }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } }
+                    }
+                }
+            });
+
+            // 2. SECTION 2: Category Distribution Doughnut Chart
+            const cats = DATA.categories || { labels: [], values: [] };
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: cats.labels,
+                    datasets: [{
+                        data: cats.values,
+                        backgroundColor: [
+                            '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#1e293b'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 11 } } }
+                    }
+                }
+            });
+
+            // 4. SECTION 4: Estimate vs Actual Line Chart
+            const estAct = DATA.estimate_vs_actual || { labels: [], estimates: [], actuals: [] };
+            new Chart(document.getElementById('estVsActChart'), {
+                type: 'line',
+                data: {
+                    labels: estAct.labels,
+                    datasets: [
+                        {
+                            label: 'Estimate Hours',
+                            data: estAct.estimates,
+                            borderColor: colorPrimary,
+                            borderDash: [4, 4],
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: 'Actual Hours',
+                            data: estAct.actuals,
+                            borderColor: colorSuccess,
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: colorGrid }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: colorGrid }, ticks: { color: '#94a3b8' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } }
+                    }
+                }
+            });
+
+            // 5. SECTION 5: Project Progress Tree Table Render
+            const tbody = document.getElementById('project-tree-body');
+            const projects = DATA.projects_tree || [];
+
+            function getStatusBadge(status) {
+                const st = (status || '').toLowerCase();
+                if (st.includes('done') || st.includes('completed')) {
+                    return `<span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-md text-xs font-semibold">Done ✅</span>`;
+                } else if (st.includes('hung') || st.includes('paused') || st.includes('hold')) {
+                    return `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-md text-xs font-semibold">Hung ⏸️</span>`;
+                }
+                return `<span class="bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-md text-xs font-semibold">In Progress 🔄</span>`;
+            }
+
+            let html = '';
+            projects.forEach(p => {
+                // Project Row
+                html += `
+                    <tr class="bg-slate-800/40 font-bold text-white">
+                        <td class="py-3 px-4 flex items-center gap-2">
+                            <span>📁</span> ${p.name} <span class="text-xs text-slate-400 font-mono">(${p.code})</span>
+                        </td>
+                        <td class="py-3 px-4"><span class="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">Project</span></td>
+                        <td class="py-3 px-4">${getStatusBadge(p.status)}</td>
+                        <td class="py-3 px-4 text-right">—</td>
+                        <td class="py-3 px-4 text-right">—</td>
+                    </tr>
+                `;
+                (p.kpis || []).forEach(k => {
+                    // KPI Row
+                    html += `
+                        <tr class="bg-slate-900/40 text-slate-200">
+                            <td class="py-2.5 px-4 pl-8 flex items-center gap-2">
+                                <span>🎯</span> ${k.name} <span class="text-xs text-slate-500 font-mono">(${k.code})</span>
+                            </td>
+                            <td class="py-2.5 px-4"><span class="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">KPI</span></td>
+                            <td class="py-2.5 px-4">${getStatusBadge(k.status)}</td>
+                            <td class="py-2.5 px-4 text-right">—</td>
+                            <td class="py-2.5 px-4 text-right">—</td>
+                        </tr>
+                    `;
+                    (k.subtasks || []).forEach(s => {
+                        // Subtask Row
+                        html += `
+                            <tr class="text-slate-300 hover:bg-slate-800/30 transition-colors">
+                                <td class="py-2 px-4 pl-12 flex items-center gap-2">
+                                    <span>🧩</span> ${s.name} <span class="text-xs text-slate-500 font-mono">(${s.code})</span>
+                                </td>
+                                <td class="py-2 px-4"><span class="text-xs text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">SubTask</span></td>
+                                <td class="py-2 px-4">${getStatusBadge(s.status)}</td>
+                                <td class="py-2 px-4 text-right font-mono font-semibold text-emerald-400">${s.actual_h.toFixed(1)}h</td>
+                                <td class="py-2 px-4 text-right font-mono text-slate-400">${s.estimate_h.toFixed(1)}h</td>
+                            </tr>
+                        `;
+                    });
+                });
+            });
+
+            if (!html) {
+                html = `<tr><td colspan="5" class="text-center py-6 text-slate-500">No project tasks recorded yet.</td></tr>`;
+            }
+
+            tbody.innerHTML = html;
+        });
+    </script>
+</body>
+</html>
