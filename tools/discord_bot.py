@@ -1115,6 +1115,26 @@ async def status(interaction: discord.Interaction):
     await _send_embed(interaction, embed, out, deferred, "status.md", ephemeral=True)
 
 
+@bot.tree.command(name="dashboard", description="Generate & deploy WorkLog performance dashboard to GitHub Pages")
+async def cmd_dashboard(interaction: discord.Interaction):
+    deferred = await _defer(interaction, ephemeral=True)
+    try:
+        ok, url = gen_dashboard.deploy_dashboard()
+        if ok:
+            fields = [
+                ("🌐 Public URL", f"[Open Performance Dashboard]({url})", False),
+                ("⏱️ Last Generated", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ICT"), True),
+                ("📊 Features", "5 Visual Sections (Daily Hours, Category, RPG Stats, Est vs Act, Quests)", False),
+            ]
+            embed = build_action_card("📊 Performance Dashboard Deployed", 0x3b82f6, user=interaction.user, fields=fields)
+        else:
+            embed = build_action_card("⚠️ Dashboard Deployment Error", 0xef4444, user=interaction.user, raw_output=f"Error: {url}")
+    except Exception as e:
+        embed = build_action_card("⚠️ Dashboard Error", 0xef4444, user=interaction.user, raw_output=f"Exception: {e}")
+
+    await _send_embed(interaction, embed, "", deferred, ephemeral=True)
+
+
 @bot.tree.command(name="today", description="Show today's time summary")
 async def today(interaction: discord.Interaction):
     deferred = await _defer(interaction)
