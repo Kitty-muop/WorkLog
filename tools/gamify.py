@@ -7,11 +7,83 @@ from pathlib import Path
 WORKLOG = Path("D:/WorkLog/worklog.xlsx")
 SCORE_FILE = Path("D:/WorkLog/.gamify_data.json")
 
-SCORE_THRESHOLDS = [0, 10, 25, 50, 100, 200, 350, 500]
-LEVEL_NAMES = [
-    "Rookie", "Bronze", "Silver", "Gold",
-    "Platinum", "Diamond", "Master", "Grandmaster"
+PRODUCTION_CATEGORIES = [
+    "Development",
+    "Debug / Bug Fix",
+    "Refactoring",
+    "Code Review",
+    "Testing / QA",
+    "DevOps / CI-CD",
+    "Documentation"
 ]
+
+def generate_level_thresholds():
+    """Generate 101 level thresholds (Level 0 to Level 100) across 5 major tiers."""
+    thresholds = [0]
+    curr = 0
+    for lvl in range(1, 101):
+        if lvl <= 20:
+            step = 50       # Tier 1: Novice (0 - 1,000 EXP)
+        elif lvl <= 40:
+            step = 100      # Tier 2: Adventurer (1,001 - 3,000 EXP)
+        elif lvl <= 60:
+            step = 200      # Tier 3: Expert (3,001 - 7,000 EXP)
+        elif lvl <= 80:
+            step = 400      # Tier 4: Master (7,001 - 15,000 EXP)
+        else:
+            step = 800      # Tier 5: Grandmaster Legend (15,001 - 31,000 EXP)
+        curr += step
+        thresholds.append(curr)
+    return thresholds
+
+SCORE_THRESHOLDS = generate_level_thresholds()
+
+def get_tier_name(level):
+    """Map Level (0..100) to 5 Major Level Milestones."""
+    if level <= 20:
+        return "Novice"
+    elif level <= 40:
+        return "Adventurer"
+    elif level <= 60:
+        return "Expert"
+    elif level <= 80:
+        return "Master"
+    else:
+        return "Grandmaster Legend"
+
+def calculate_task_exp(estimated_h, actual_h, category="Development"):
+    """Calculate EXP based on difficulty/estimate, actual/estimate ratio, and category bonuses."""
+    est = float(estimated_h or 1.0)
+    act = float(actual_h or 1.0)
+    cat_lower = str(category or "").strip().lower()
+    is_debug = any(k in cat_lower for k in ("debug", "bug", "fix", "troubleshoot"))
+
+    # Base EXP proportional to estimated effort (20 EXP per estimated hour)
+    base_exp = est * 20.0
+
+    if act <= est:
+        # Efficiency Bonus for completing on time or early
+        ratio = act / est if est > 0 else 1.0
+        efficiency_factor = 1.0 + (1.0 - ratio) * 0.5
+        exp = base_exp * efficiency_factor
+
+        # Debug category on-time bonus (+30% EXP)
+        if is_debug:
+            exp *= 1.30
+    else:
+        # Penalty for exceeding estimated time
+        penalty_ratio = est / act if act > 0 else 0.5
+
+        if is_debug:
+            # Heavy penalty for debug/bug fix exceeding estimate
+            penalty_factor = max(0.05, penalty_ratio ** 2)
+        else:
+            penalty_factor = max(0.2, penalty_ratio)
+
+        exp = base_exp * penalty_factor
+
+    return round(exp, 1), is_debug
+
 DAILY_TARGET_HOURS = 7.5
 
 def load_gamify_data():
@@ -94,7 +166,42 @@ def update_streak(data, daily_summary, today):
     if streak > data["max_streak"]:
         data["max_streak"] = streak
 
-def compute_scores(entries, daily_summary, data, today):
+def compute_completion_bonus(wb):
+    """Calculate bonus EXP for completed Subtasks, KPIs, and Projects."""
+    completion_exp = 0
+    counts = {"subtasks": 0, "kpis": 0, "projects": 0}
+
+    # 1. Subtasks (+15 EXP each)
+    if 'SubTasks' in wb.sheetnames:
+        ws_sub = wb['SubTasks']
+        for r in ws_sub.iter_rows(min_row=2, values_only=True):
+            st = str(r[4] or '').lower() if len(r) > 4 else ''
+            if st in ('done', 'completed'):
+                completion_exp += 15
+                counts["subtasks"] += 1
+
+    # 2. KPIs (+50 EXP each)
+    if 'KPIs' in wb.sheetnames:
+        ws_kpi = wb['KPIs']
+        for r in ws_kpi.iter_rows(min_row=2, values_only=True):
+            st = str(r[6] or '').lower() if len(r) > 6 else ''
+            if st in ('done', 'completed'):
+                completion_exp += 50
+                counts["kpis"] += 1
+
+    # 3. Projects (+150 EXP each)
+    if 'Projects' in wb.sheetnames:
+        ws_proj = wb['Projects']
+        for r in ws_proj.iter_rows(min_row=2, values_only=True):
+            st = str(r[3] or '').lower() if len(r) > 3 else ''
+            if st in ('done', 'completed'):
+                completion_exp += 150
+                counts["projects"] += 1
+
+    return completion_exp, counts
+
+
+def compute_scores(entries, daily_summary, data, today, wb=None):
     today_str = str(today)
     today_entry = daily_summary.get(today, None)
     today_score = 0
@@ -114,17 +221,26 @@ def compute_scores(entries, daily_summary, data, today):
     today_score += streak_bonus
 
     daily_history = data.get("daily_history", {})
-    if today_str not in daily_history:
-        daily_history[today_str] = []
-    daily_history[today_str].append({
+    daily_history[today_str] = {
         "date": today_str,
         "score": today_score,
         "hours": today_entry["total_hours"] if today_entry else 0,
         "tasks": today_entry["task_count"] if today_entry else 0,
-    })
+    }
     data["daily_history"] = daily_history
 
-    data["total_score"] += today_score
+    # Sum all historical daily scores
+    work_score = sum(day.get('score', 0) for day in daily_history.values() if isinstance(day, dict))
+    
+    # Add completion bonus
+    completion_exp = 0
+    counts = {"subtasks": 0, "kpis": 0, "projects": 0}
+    if wb:
+        completion_exp, counts = compute_completion_bonus(wb)
+    
+    data["total_score"] = work_score + completion_exp
+    data["completion_exp"] = completion_exp
+    data["completed_counts"] = counts
 
     # Determine level
     for i, threshold in reversed(list(enumerate(SCORE_THRESHOLDS))):
@@ -178,7 +294,7 @@ def run():
 
     data = load_gamify_data()
     update_streak(data, daily, today)
-    today_score = compute_scores(entries, daily, data, today)
+    today_score = compute_scores(entries, daily, data, today, wb=wb)
     consistency, logged_days, total_days = compute_consistency(entries)
     task_perf = compute_task_performance(ws, entries)
 
@@ -188,7 +304,7 @@ def run():
         "today_score": today_score,
         "total_score": data["total_score"],
         "level": data["level"],
-        "level_name": LEVEL_NAMES[data["level"]],
+        "level_name": get_tier_name(data["level"]),
         "streak": data["streak"],
         "max_streak": data["max_streak"],
         "consistency_pct": consistency,

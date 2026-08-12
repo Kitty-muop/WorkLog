@@ -210,8 +210,8 @@ def make_game_exp_bar(score: int) -> tuple[str, str, int, int]:
     pct = exp_in_level / level_range
 
     bar = make_progress_bar(pct, length=10)
-    level_name = names[lvl] if lvl < len(names) else "Legend"
-    return level_name, bar, score, next_threshold
+    tier_name = gm.get_tier_name(lvl) if (gm and hasattr(gm, 'get_tier_name')) else "Novice"
+    return f"{tier_name} (Lv.{lvl})", bar, score, next_threshold
 
 
 def build_gamified_hud_embed(user_id=None):
@@ -882,6 +882,19 @@ def _status_emoji(status):
     return '⚪'
 
 
+async def _ac_cat(interaction: discord.Interaction, current: str):
+    cats = gm.PRODUCTION_CATEGORIES if (gm and hasattr(gm, 'PRODUCTION_CATEGORIES')) else [
+        "Development", "Debug / Bug Fix", "Refactoring", "Code Review", "Testing / QA", "DevOps / CI-CD", "Documentation"
+    ]
+    c_lower = current.strip().lower()
+    choices = []
+    for c in cats:
+        if not c_lower or c_lower in c.lower():
+            emoji = "🐛" if "debug" in c.lower() or "bug" in c.lower() else "🏷️"
+            choices.append(app_commands.Choice(name=f"{emoji} {c}", value=c))
+    return choices[:5]
+
+
 _ac_all_proj = _ac_proj
 _ac_all_task = _ac_task
 _ac_all_sub = _ac_sub
@@ -890,13 +903,13 @@ _ac_all_sub = _ac_sub
 # ════════════════════════  Timer  ════════════════════════
 
 @bot.tree.command(name="start", description="Start timer")
-@app_commands.describe(project="Project name (auto: git folder)", task="Father task (auto: git branch)", subtask="Sub task")
-@app_commands.autocomplete(project=_ac_all_proj, task=_ac_all_task, subtask=_ac_all_sub)
-async def start(interaction: discord.Interaction, project: str = None, task: str = None, subtask: str = None):
-    deferred = await _defer(interaction)
+@app_commands.describe(project="Project name (auto: git folder)", task="Father task (auto: git branch)", subtask="Sub task", category="Work Category")
+@app_commands.autocomplete(project=_ac_all_proj, task=_ac_all_task, subtask=_ac_all_sub, category=_ac_cat)
+async def start(interaction: discord.Interaction, project: str = None, task: str = None, subtask: str = None, category: str = None):
+    deferred = await _defer(interaction, ephemeral=True)
     u_id = str(interaction.user.id)
     u_name = interaction.user.display_name
-    out, ret = _run(tm.cmd_start, project=project, task=task, subtask=subtask, user_id=u_id, user_name=u_name)
+    out, ret = _run(tm.cmd_start, project=project, task=task, subtask=subtask, category=category, user_id=u_id, user_name=u_name)
     clear_bot_cache()
 
     state = tm.load_state()

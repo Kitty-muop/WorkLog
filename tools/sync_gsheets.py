@@ -118,9 +118,33 @@ def full_sync():
 
         print(f"[SYNC] [OK] '{sheet_name}' synced: {data_rows} data rows (+ 1 header)")
 
+    # Sync Gamify Summary worksheet
+    try:
+        import gamify
+        g_res = gamify.run()
+        gamify_rows = [
+            ["Metric", "Value", "Notes / Details"],
+            ["Hero Rank", f"{g_res.get('level_name')} (Lv.{g_res.get('level')})", "Calculated from 5 Level Milestones"],
+            ["Total EXP Score", str(g_res.get('total_score', 0)), "Work EXP + Completion EXP"],
+            ["Current Level", f"Level {g_res.get('level', 0)} / 100", "0 to 100 Range"],
+            ["Daily Work Score", str(g_res.get('today_score', 0)), "Target 7.5h + Category Bonus"],
+            ["Daily Streak", f"{g_res.get('streak', 0)} Days", f"Best: {g_res.get('max_streak', 0)} Days"],
+            ["Consistency Rate", f"{g_res.get('consistency_pct', 0)}%", f"Logged: {g_res.get('logged_weekdays', 0)}/{g_res.get('total_weekdays', 0)} weekdays"],
+            ["Sync Date", datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "Auto-synced from WorkLog System"]
+        ]
+        try:
+            gs_gamify = svc.worksheet('Gamify Summary')
+        except Exception:
+            gs_gamify = svc.add_worksheet(title='Gamify Summary', rows=20, cols=3)
+        gs_gamify.clear()
+        gs_gamify.update(gamify_rows, value_input_option='USER_ENTERED')
+        print("[SYNC] [OK] 'Gamify Summary' synced to Google Sheets!")
+    except Exception as e:
+        print(f"[SYNC] WARNING: Could not sync Gamify Summary: {e}")
+
     print()
     print("[SYNC] [!!]")
-    print("[SYNC] [OK] FULL SYNC COMPLETE — All sheets updated!")
+    print("[SYNC] [OK] FULL SYNC COMPLETE — All 5 sheets updated!")
     print("[SYNC] [!!]")
     return True
 
